@@ -1,11 +1,14 @@
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Register8 {
     B, C, D, E, H, L, M, A,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Register16 {
     Bc, De, Hl, Sp,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Register {
     Register8(Register8),
     Register16(Register16),
@@ -13,20 +16,24 @@ pub enum Register {
 
 pub type Data8 = u8;
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Data16 { low: Data8, high: Data8, }
 
 pub type Address = Data16;
 
 pub type Port = Data8;
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Condition {
     Carry, NoCarry, Zero, NoZero, Positive, Minus, ParityEven, ParityOdd,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ResetNumber {
     R0, R1, R2, R3, R4, R5, R6, R7,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Instruction {
     Nop,
     Lxi(Register16, Data16),
