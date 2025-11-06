@@ -229,6 +229,10 @@ pub struct Machine {
     pc: Data16,
 }
 
+fn is_even(value: u32) -> bool {
+    value % 2 == 0
+}
+
 impl Machine {
     pub fn new() -> Self {
         Self {
@@ -359,10 +363,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -376,10 +378,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -397,10 +397,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -417,10 +415,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -433,10 +429,8 @@ impl Machine {
                 self.conditions.set(ConditionRegister::Carry, overflow);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -448,10 +442,8 @@ impl Machine {
                 self.conditions.set(ConditionRegister::Carry, overflow);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -467,10 +459,8 @@ impl Machine {
                 self.conditions.set(ConditionRegister::Carry, overflow);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -487,10 +477,8 @@ impl Machine {
                     .set(ConditionRegister::Carry, overflow1 || overflow2);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 ExecutionResult::Running
             }
@@ -510,10 +498,7 @@ impl Machine {
                 );
                 self.conditions.set(
                     ConditionRegister::Parity,
-                    self.registers
-                        .get_8(register, &self.memory)
-                        .count_ones()
-                        .is_multiple_of(2),
+                    is_even(self.registers.get_8(register, &self.memory).count_ones()),
                 );
                 self.conditions.set(
                     ConditionRegister::Zero,
@@ -537,10 +522,7 @@ impl Machine {
                 );
                 self.conditions.set(
                     ConditionRegister::Parity,
-                    self.registers
-                        .get_8(register, &self.memory)
-                        .count_ones()
-                        .is_multiple_of(2),
+                    is_even(self.registers.get_8(register, &self.memory).count_ones()),
                 );
                 self.conditions.set(
                     ConditionRegister::Zero,
@@ -588,10 +570,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions.set(ConditionRegister::Sign, result < 128);
                 self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
@@ -604,10 +584,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions.set(ConditionRegister::Sign, result < 128);
                 self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
@@ -621,10 +599,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions.set(ConditionRegister::Sign, result < 128);
                 self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
@@ -637,10 +613,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions.set(ConditionRegister::Sign, result < 128);
                 self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
@@ -654,10 +628,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions.set(ConditionRegister::Sign, result < 128);
                 self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
@@ -670,10 +642,8 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 self.conditions.set(ConditionRegister::Sign, result < 128);
                 self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
@@ -685,10 +655,8 @@ impl Machine {
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 ExecutionResult::Running
             }
             Instruction::Cpi(data) => {
@@ -698,10 +666,8 @@ impl Machine {
                 self.conditions.set(ConditionRegister::Zero, result == 0);
                 self.conditions
                     .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    result.count_ones().is_multiple_of(2),
-                );
+                self.conditions
+                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
                 ExecutionResult::Running
             }
             Instruction::Rlc => unimplemented!(),
