@@ -249,6 +249,12 @@ impl TryFrom<u8> for RestartNumber {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum InstructionOrData {
+    Instruction(Instruction),
+    Data(Data8),
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Instruction {
     // Data Transfer Group
     /// Move register / Move from memory / Move to memory
