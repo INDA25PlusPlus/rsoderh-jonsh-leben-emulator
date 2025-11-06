@@ -134,76 +134,127 @@ pub enum RestartNumber {
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Instruction {
-
     // Data Transfer Group
-
-    Mov(Register, Register),    // Move register / Move from memory / Move to memory
-    Mvi(Register, Data8),       // Move immediate / Move to memory immediate
-    Lxi(RegisterPair, Data16),  // Load register pair immediate
-    Lda(Address),               // Load accumulator direct
-    Sta(Address),               // Store accumulator direct
-    Lhld(Address),              // Load H and L direct
-    Shld(Address),              // Store H and L direct
-    Ldax(RegisterPairIndirect), // Load accumulator indirect
-    Stax(RegisterPairIndirect), // Store accumulator indirect
-    Xchg,                       // Exchange H and L with D and E
+    /// Move register / Move from memory / Move to memory
+    Mov(Register, Register),
+    /// Move immediate / Move to memory immediate
+    Mvi(Register, Data8),
+    /// Load register pair immediate
+    Lxi(RegisterPair, Data16),
+    /// Load accumulator direct
+    Lda(Address),
+    /// Store accumulator direct
+    Sta(Address),
+    /// Load H and L direct
+    Lhld(Address),
+    /// Store H and L direct
+    Shld(Address),
+    /// Load accumulator indirect
+    Ldax(RegisterPairIndirect),
+    /// Store accumulator indirect
+    Stax(RegisterPairIndirect),
+    /// Exchange H and L with D and E
+    Xchg,
 
     // Arithmetic Group
-
-    Add(Register),              // Add register / Add memory
-    Adi(Data8),                 // Add immediate
-    Adc(Register),              // Add register with carry / Add memory with carry
-    Aci(Data8),                 // Add immediate with carry
-    Sub(Register),              // Subtract register / Subtract memory
-    Sui(Data8),                 // Subtract immediate
-    Sbb(Register),              // Subtract register with borrow / Subtract memory with borrow
-    Sbi(Data8),                 // Subtract immediate with borrow
-    Inr(Register),              // Increment register / Increment memory
-    Dcr(Register),              // Decrement register / Increment memory
-    Inx(RegisterPair),          // Increment register pair
-    Dcx(RegisterPair),          // Decrement register pair
-    Dad(RegisterPair),          // Add register pair to H and L
-    Daa,                        // Decimal adjust accumulator
+    /// Add register / Add memory
+    Add(Register),
+    /// Add immediate
+    Adi(Data8),
+    /// Add register with carry / Add memory with carry
+    Adc(Register),
+    /// Add immediate with carry
+    Aci(Data8),
+    /// Subtract register / Subtract memory
+    Sub(Register),
+    /// Subtract immediate
+    Sui(Data8),
+    /// Subtract register with borrow / Subtract memory with borrow
+    Sbb(Register),
+    /// Subtract immediate with borrow
+    Sbi(Data8),
+    /// Increment register / Increment memory
+    Inr(Register),
+    /// Decrement register / Increment memory
+    Dcr(Register),
+    /// Increment register pair
+    Inx(RegisterPair),
+    /// Decrement register pair
+    Dcx(RegisterPair),
+    /// Add register pair to H and L
+    Dad(RegisterPair),
+    /// Decimal adjust accumulator
+    Daa,
 
     // Logical Group
-
-    Ana(Register),              // AND register / AND memory
-    Ani(Data8),                 // AND immediate
-    Xra(Register),              // XOR register / XOR memory
-    Xri(Data8),                 // XOR immediate
-    Ora(Register),              // OR register / OR memory
-    Ori(Data8),                 // OR immediate
-    Cmp(Register),              // Compare register / Compare memory
-    Cpi(Data8),                 // Compare immediate
-    Rlc,                        // Rotate left
-    Rrc,                        // Rotate right
-    Ral,                        // Rotate left through carry
-    Rar,                        // Rotate right through carry
-    Cma,                        // Complement accumulator
-    Cmc,                        // Complement carry
-    Stc,                        // Set carry
+    /// AND register / AND memory
+    Ana(Register),
+    /// AND immediate
+    Ani(Data8),
+    /// XOR register / XOR memory
+    Xra(Register),
+    /// XOR immediate
+    Xri(Data8),
+    /// OR register / OR memory
+    Ora(Register),
+    /// OR immediate
+    Ori(Data8),
+    /// Compare register / Compare memory
+    Cmp(Register),
+    /// Compare immediate
+    Cpi(Data8),
+    /// Rotate left
+    Rlc,
+    /// Rotate right
+    Rrc,
+    /// Rotate left through carry
+    Ral,
+    /// Rotate right through carry
+    Rar,
+    /// Complement accumulator
+    Cma,
+    /// Complement carry
+    Cmc,
+    /// Set carry
+    Stc,
 
     // Branch Group
-
-    Jmp(Address),               // Jump
-    Jcc(Condition, Address),    // Conditional jump
-    Call(Address),              // Call
-    Ccc(Condition, Address),    // Conditional call
-    Ret,                        // Return
-    Rcc(Condition),             // Conditional return
-    Rst(RestartNumber),         // Restart
-    Pchl,                       // Jump H and L indirect - move H and L to PC
+    /// Jump
+    Jmp(Address),
+    /// Conditional jump
+    Jcc(Condition, Address),
+    /// Call
+    Call(Address),
+    /// Conditional call
+    Ccc(Condition, Address),
+    /// Return
+    Ret,
+    /// Conditional return
+    Rcc(Condition),
+    /// Restart
+    Rst(RestartNumber),
+    /// Jump H and L indirect - move H and L to PC
+    Pchl,
 
     // Stack, I/O, and Machine Control Group
-
-    Push(RegisterPairOrStatus), // Push / Push processor status word
-    Pop(RegisterPairOrStatus),  // Pop / Pop processor status word
-    Xthl,                       // Exchange stack top with H and L
-    Sphl,                       // Move HL to SP
-    In(Port),                   // Input
-    Out(Port),                  // Output
-    Ei,                         // Enable interrupts
-    Di,                         // Disable interrupts
-    Hlt,                        // Halt
-    Nop,                        // No op
+    /// Push / Push processor status word
+    Push(RegisterPairOrStatus),
+    /// Pop / Pop processor status word
+    Pop(RegisterPairOrStatus),
+    /// Exchange stack top with H and L
+    Xthl,
+    /// Move HL to SP
+    Sphl,
+    /// Input
+    In(Port),
+    /// Output
+    Out(Port),
+    /// Enable interrupts
+    Ei,
+    /// Disable interrupts
+    Di,
+    /// Halt
+    Hlt,
+    /// No op
+    Nop,
 }
