@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Add};
+use std::{fmt::Display, ops::{Add, AddAssign}};
 
 use parsable::Parsable;
 
@@ -149,6 +149,12 @@ impl From<u16> for Data16 {
     }
 }
 
+impl From<Data16> for u16 {
+    fn from(value: Data16) -> Self {
+        ((value.high as u16) << 8) | (value.low as u16)
+    }
+}
+
 impl Add for Data16 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
@@ -156,7 +162,7 @@ impl Add for Data16 {
     }
 }
 
-pub type Address = Data16;
+pub type Address = u16;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]

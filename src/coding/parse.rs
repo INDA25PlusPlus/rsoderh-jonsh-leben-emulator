@@ -249,7 +249,7 @@ pub fn parse_shld<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Shld(data));
+    return Some(Instruction::Shld(data.into()));
 }
 
 pub fn parse_daa<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -277,7 +277,7 @@ pub fn parse_lhld<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Lhld(data));
+    return Some(Instruction::Lhld(data.into()));
 }
 
 pub fn parse_cma<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -305,7 +305,7 @@ pub fn parse_sta<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Sta(data));
+    return Some(Instruction::Sta(data.into()));
 }
 
 pub fn parse_stc<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -333,7 +333,7 @@ pub fn parse_lda<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Lda(data));
+    return Some(Instruction::Lda(data.into()));
 }
 
 pub fn parse_cmc<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -561,14 +561,14 @@ pub fn parse_jcc<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
 
     let cc: Condition = extract_bits(opcode, 3..6).try_into().ok()?;
 
-    let addr = Address {
+    let addr = Data16 {
         low: bytes[1],
         high: bytes[2],
     };
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Jcc(cc, addr));
+    return Some(Instruction::Jcc(cc, addr.into()));
 }
 
 pub fn parse_jmp<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -579,14 +579,14 @@ pub fn parse_jmp<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
         return None;
     };
 
-    let addr = Address {
+    let addr = Data16 {
         low: bytes[1],
         high: bytes[2],
     };
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Jmp(addr));
+    return Some(Instruction::Jmp(addr.into()));
 }
 
 pub fn parse_ccc<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -599,14 +599,14 @@ pub fn parse_ccc<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
 
     let cc: Condition = extract_bits(opcode, 3..6).try_into().ok()?;
 
-    let addr = Address {
+    let addr = Data16 {
         low: bytes[1],
         high: bytes[2],
     };
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Ccc(cc, addr));
+    return Some(Instruction::Ccc(cc, addr.into()));
 }
 
 pub fn parse_push<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
@@ -664,14 +664,14 @@ pub fn parse_call<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
         return None;
     };
 
-    let addr = Address {
+    let addr = Data16 {
         low: bytes[1],
         high: bytes[2],
     };
 
     stream.skip_n(LEN);
 
-    return Some(Instruction::Call(addr));
+    return Some(Instruction::Call(addr.into()));
 }
 
 #[cfg(test)]

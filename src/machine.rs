@@ -12,20 +12,20 @@ impl Memory {
     }
 
     pub fn read_8(&self, address: Address) -> Data8 {
-        self.0[address.value() as usize]
+        self.0[address as usize]
     }
     pub fn read_16(&self, address: Address) -> Option<Data16> {
-        let low = self.0[address.value() as usize];
-        let high = *self.0.get(address.value() as usize + 1)?;
+        let low = self.0[address as usize];
+        let high = *self.0.get(address as usize + 1)?;
         Some(Data16::new(low, high))
     }
 
     pub fn write_8(&mut self, address: Address, value: Data8) {
-        self.0[address.value() as usize] = value;
+        self.0[address as usize] = value;
     }
     pub fn write_16(&mut self, address: Address, value: Data16) -> Option<()> {
-        self.0[address.value() as usize] = value.low;
-        *self.0.get_mut(address.value() as usize + 1)? = value.high;
+        self.0[address as usize] = value.low;
+        *self.0.get_mut(address as usize + 1)? = value.high;
 
         Some(())
     }
@@ -121,7 +121,7 @@ impl RegisterMap {
             Register::M(..) => {
                 let address = self.get_16(RegisterPair::Hl(()));
 
-                return memory.read_8(address);
+                return memory.read_8(address.into());
             }
             Register::A(..) => {
                 return self.a;
@@ -152,7 +152,7 @@ impl RegisterMap {
             Register::M(..) => {
                 let address = self.get_16(RegisterPair::Hl(()));
 
-                memory.write_8(address, value);
+                memory.write_8(address.into(), value);
             }
             Register::A(..) => {
                 self.a = value;

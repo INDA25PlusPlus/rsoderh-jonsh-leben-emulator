@@ -174,7 +174,7 @@ impl Ui {
         f.render_widget(block, area);
 
         let memory_view = MemoryView::new(self.machine.memory().as_raw())
-            .shown_address(Data16::from(0))
+            .shown_address(0)
             .label_style(*STYLE_LABEL)
             .address_style(*STYLE_ADDRESS)
             .data_style(*STYLE_DATA);

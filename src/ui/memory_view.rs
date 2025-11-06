@@ -26,7 +26,7 @@ impl<'a> MemoryView<'a> {
     }
 
     pub fn shown_address(mut self, address: Address) -> Self {
-        self.shown_address = address.value();
+        self.shown_address = address;
         self
     }
 
