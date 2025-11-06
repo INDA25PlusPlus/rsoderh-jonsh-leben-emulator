@@ -299,9 +299,28 @@ impl Machine {
                     .set_8(Register::A(()), result, &mut self.memory);
                 ExecutionResult::Running
             }
-            Instruction::Adi(_) => unimplemented!(),
-            Instruction::Adc(_register) => unimplemented!(),
-            Instruction::Aci(_) => unimplemented!(),
+            Instruction::Adi(data) => {
+                let a = self.registers.get_8(Register::A(()), &self.memory);
+                let result = a.wrapping_add(data);
+                self.registers
+                    .set_8(Register::A(()), result, &mut self.memory);
+                ExecutionResult::Running
+            }
+            Instruction::Adc(register) => {
+                let a = self.registers.get_8(Register::A(()), &self.memory);
+                let value = self.registers.get_8(register, &self.memory);
+                let result = a.wrapping_add(value);
+                self.registers
+                    .set_8(Register::A(()), result, &mut self.memory);
+                ExecutionResult::Running
+            }
+            Instruction::Aci(data) => {
+                let a = self.registers.get_8(Register::A(()), &self.memory);
+                let mut result = a.wrapping_add(data);
+                self.registers
+                    .set_8(Register::A(()), result, &mut self.memory);
+                ExecutionResult::Running
+            }
             Instruction::Sub(_register) => unimplemented!(),
             Instruction::Sui(_) => unimplemented!(),
             Instruction::Sbb(_register) => unimplemented!(),
