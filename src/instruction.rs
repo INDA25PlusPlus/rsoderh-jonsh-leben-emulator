@@ -51,9 +51,9 @@ impl TryFrom<u8> for Register {
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Parsable)]
 pub enum RegisterPair {
     Bc(#[literal = b"B"] ()) = 0b00,
-    De(#[literal = b"B"] ()) = 0b01,
-    Hl(#[literal = b"B"] ()) = 0b10,
-    Sp(#[literal = b"B"] ()) = 0b11,
+    De(#[literal = b"D"] ()) = 0b01,
+    Hl(#[literal = b"H"] ()) = 0b10,
+    Sp(#[literal = b"SP"] ()) = 0b11,
 }
 
 impl Display for RegisterPair {
@@ -81,40 +81,40 @@ impl TryFrom<u8> for RegisterPair {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Parsable)]
 pub enum RegisterPairIndirect {
-    Bc = 0b00,
-    De = 0b01,
+    Bc(#[literal = b"B"] ()) = 0b00,
+    De(#[literal = b"D"] ()) = 0b01,
 }
 
 impl TryFrom<u8> for RegisterPairIndirect {
     type Error = ();
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0b00 => Ok(Self::Bc),
-            0b01 => Ok(Self::De),
+            0b00 => Ok(Self::Bc(())),
+            0b01 => Ok(Self::De(())),
             _ => Err(()),
         }
     }
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Parsable)]
 pub enum RegisterPairOrStatus {
-    Bc = 0b00,
-    De = 0b01,
-    Hl = 0b10,
-    StatusWord = 0b11,
+    Bc(#[literal = b"B"] ()) = 0b00,
+    De(#[literal = b"D"] ()) = 0b01,
+    Hl(#[literal = b"H"] ()) = 0b10,
+    StatusWord(#[literal = b"PSW"] ()) = 0b11,
 }
 
 impl TryFrom<u8> for RegisterPairOrStatus {
     type Error = ();
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0b00 => Ok(Self::Bc),
-            0b01 => Ok(Self::De),
-            0b10 => Ok(Self::Hl),
-            0b11 => Ok(Self::StatusWord),
+            0b00 => Ok(Self::Bc(())),
+            0b01 => Ok(Self::De(())),
+            0b10 => Ok(Self::Hl(())),
+            0b11 => Ok(Self::StatusWord(())),
             _ => Err(()),
         }
     }
