@@ -291,7 +291,14 @@ impl Machine {
             Instruction::Ldax(_register_pair_indirect) => unimplemented!(),
             Instruction::Stax(_register_pair_indirect) => unimplemented!(),
             Instruction::Xchg => unimplemented!(),
-            Instruction::Add(_register) => unimplemented!(),
+            Instruction::Add(register) => {
+                let a = self.registers.get_8(Register::A(()), &self.memory);
+                let value = self.registers.get_8(register, &self.memory);
+                let result = a.wrapping_add(value);
+                self.registers
+                    .set_8(Register::A(()), result, &mut self.memory);
+                ExecutionResult::Running
+            }
             Instruction::Adi(_) => unimplemented!(),
             Instruction::Adc(_register) => unimplemented!(),
             Instruction::Aci(_) => unimplemented!(),
@@ -339,5 +346,27 @@ impl Machine {
             Instruction::Hlt => ExecutionResult::Halt,
             Instruction::Nop => ExecutionResult::Running,
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_register() {
+        let mut machine = Machine::new();
+
+        machine
+            .registers
+            .set_8(Register::A(()), 0x23, &mut machine.memory);
+        machine
+            .registers
+            .set_8(Register::B(()), 0x42, &mut machine.memory);
+
+        let result = machine.execute(Instruction::Add(Register::B(())));
+
+        assert_eq!(result, ExecutionResult::Running);
+
+        assert_eq!(machine.register_8(Register::A(())), 0x65);
     }
 }
