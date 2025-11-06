@@ -8,6 +8,6 @@ anyhow = "1.0.100"
 crossterm = "0.29.0"
 tui = "0.19.0"
 
-parsable = { git="https://github.com/LeonardBengtsson/parsing-library", rev = "623d78b" }
+parsable = { git="https://github.com/LeonardBengtsson/parsing-library", rev = "fd28142" }
 serde = "1.0.228"
 clap = { version = "4.5.51", features = ["derive"] }
