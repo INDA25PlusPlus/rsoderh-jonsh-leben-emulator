@@ -1,9 +1,92 @@
 parsable::literals! {
     pub struct Comma = b",";
+
+    pub struct Origin = b"ORG";
+    pub struct EndOfAssembly = b"END";
+    pub struct DefineByte = b"DB";
+    pub struct DefineWord = b"DW";
+    pub struct DefineStorage = b"DS";
+
     pub struct Mov = b"MOV";
     pub struct Mvi = b"MVI";
     pub struct Lxi = b"LXI";
     pub struct Lda = b"LDA";
     pub struct Sta = b"STA";
     pub struct Lhld = b"LHLD";
+    pub struct Shld = b"SHLD";
+    pub struct Ldax = b"LDAX";
+    pub struct Stax = b"STAX";
+    pub struct Xchg = b"XCHG";
+
+    pub struct Add = b"ADD";
+    pub struct Adi = b"ADI";
+    pub struct Adc = b"ADC";
+    pub struct Aci = b"ACI";
+    pub struct Sub = b"SUB";
+    pub struct Sui = b"SUI";
+    pub struct Sbb = b"SBB";
+    pub struct Sbi = b"SBI";
+    pub struct Inr = b"INR";
+    pub struct Dcr = b"DCR";
+    pub struct Inx = b"INX";
+    pub struct Dcx = b"DCX";
+    pub struct Dad = b"DAD";
+    pub struct Daa = b"DAA";
+
+    pub struct Ana = b"ANA";
+    pub struct Ani = b"ANI";
+    pub struct Xra = b"XRA";
+    pub struct Xri = b"XRI";
+    pub struct Ora = b"ORA";
+    pub struct Ori = b"ORI";
+    pub struct Cmp = b"CMP";
+    pub struct Cpi = b"CPI";
+    pub struct Rlc = b"RLC";
+    pub struct Rrc = b"RRC";
+    pub struct Ral = b"RAL";
+    pub struct Rar = b"RAR";
+    pub struct Cma = b"CMA";
+    pub struct Cmc = b"CMC";
+    pub struct Stc = b"STC";
+
+    pub struct Jmp = b"JMP";
+    pub struct Jc = b"JC";
+    pub struct Jnc = b"JNC";
+    pub struct Jz = b"JZ";
+    pub struct Jnz = b"JNZ";
+    pub struct Jp = b"JP";
+    pub struct Jm = b"JM";
+    pub struct Jpe = b"JPE";
+    pub struct Jpo = b"JPO";
+    pub struct Call = b"CALL";
+    pub struct Cc = b"CC";
+    pub struct Cnc = b"CNC";
+    pub struct Cz = b"CZ";
+    pub struct Cnz = b"CNZ";
+    pub struct Cp = b"CP";
+    pub struct Cm = b"CM";
+    pub struct Cpe = b"CPE";
+    pub struct Cpo = b"CPO";
+    pub struct Ret = b"RET";
+    pub struct Rc = b"RC";
+    pub struct Rnc = b"RNC";
+    pub struct Rz = b"RZ";
+    pub struct Rnz = b"RNZ";
+    pub struct Rp = b"RP";
+    pub struct Rm = b"RM";
+    pub struct Rpe = b"RPE";
+    pub struct Rpo = b"RPO";
+    pub struct Rst = b"RST";
+    pub struct Pchl = b"PCHL";
+
+    pub struct Push = b"PUSH";
+    pub struct Pop = b"POP";
+    pub struct Xthl = b"XTHL";
+    pub struct Sphl = b"SPHL";
+    pub struct In = b"IN";
+    pub struct Out = b"OUT";
+    pub struct Ei = b"EI";
+    pub struct Di = b"DI";
+    pub struct Hlt = b"HLT";
+    pub struct Nop = b"NOP";
 }
