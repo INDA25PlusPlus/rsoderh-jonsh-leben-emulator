@@ -15,6 +15,21 @@ pub enum Register {
     M(#[literal = b"A"] ()) = 0b110,
 }
 
+impl Register {
+    pub fn repr(&self) -> u8 {
+        match self{
+            Register::A(_) => 0b111,
+            Register::B(_) => 0b000,
+            Register::C(_) => 0b001,
+            Register::D(_) => 0b010,
+            Register::E(_) => 0b011,
+            Register::H(_) => 0b100,
+            Register::L(_) => 0b101,
+            Register::M(_) => 0b110,
+        }
+    }
+}
+
 impl Display for Register {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -56,6 +71,17 @@ pub enum RegisterPair {
     Sp(#[literal = b"SP"] ()) = 0b11,
 }
 
+impl RegisterPair {
+    pub fn repr(&self) -> u8 {
+        match self{
+            RegisterPair::Bc(_) => 0b00,
+            RegisterPair::De(_) => 0b01,
+            RegisterPair::Hl(_) => 0b10,
+            RegisterPair::Sp(_) => 0b11,
+        }
+    }
+}
+
 impl Display for RegisterPair {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -87,6 +113,15 @@ pub enum RegisterPairIndirect {
     De(#[literal = b"D"] ()) = 0b01,
 }
 
+impl RegisterPairIndirect {
+    pub fn repr(&self) -> u8 {
+        match self{
+            Self::Bc(_) => 0b00,
+            Self::De(_) => 0b01,
+        }
+    }
+}
+
 impl TryFrom<u8> for RegisterPairIndirect {
     type Error = ();
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -105,6 +140,18 @@ pub enum RegisterPairOrStatus {
     De(#[literal = b"D"] ()) = 0b01,
     Hl(#[literal = b"H"] ()) = 0b10,
     StatusWord(#[literal = b"PSW"] ()) = 0b11,
+}
+
+
+impl RegisterPairOrStatus {
+    pub fn repr(&self) -> u8 {
+        match self{
+            Self::Bc(_) => 0b00,
+            Self::De(_) => 0b01,
+            Self::Hl(_) => 0b10,
+            Self::StatusWord(_) => 0b11,
+        }
+    }
 }
 
 impl TryFrom<u8> for RegisterPairOrStatus {

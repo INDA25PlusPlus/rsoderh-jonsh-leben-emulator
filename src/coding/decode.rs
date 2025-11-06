@@ -3,7 +3,7 @@ use std::ops::Range;
 use crate::{
     coding::reader::Reader,
     instruction::{
-        Address, Condition, Data16, Instruction, Register, RegisterPair, RegisterPairIndirect,
+        Condition, Data16, Instruction, Register, RegisterPair, RegisterPairIndirect,
         RegisterPairOrStatus, RestartNumber,
     },
 };
