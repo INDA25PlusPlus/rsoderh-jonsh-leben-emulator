@@ -3,7 +3,7 @@ use std::io::Write;
 
 use crate::{
     assembler::{labels::{Label, LabelLookup}, parse::{LabelSegment, SourceFile}},
-    instruction::{Address, Instruction},
+    instruction::{Address, InstructionOrData},
 };
 
 mod labels;
@@ -13,7 +13,7 @@ pub type AssemblySource<'a> = &'a [u8];
 
 pub fn parse_assembly(
     source: AssemblySource,
-) -> Result<Vec<Instruction>, String> {
+) -> Result<Vec<InstructionOrData>, String> {
     let mut stream = parsable::ScopedStream::new(source);
     let outcome = parsable::WithEnd::<SourceFile>::parse(&mut stream);
     let source_file = match outcome.expect("parsing should give a result") {
@@ -63,7 +63,7 @@ pub fn parse_assembly(
         if let Some(code) = code_line.code {
             let instruction = code.instruction.node.into_inner(&labels)
                 .ok_or(format!("{}: Unknown label", code.instruction.index))?;
-            instructions.push(instruction);
+            instructions.push(InstructionOrData::Instruction(instruction));
         }
     }
     Ok(instructions)
