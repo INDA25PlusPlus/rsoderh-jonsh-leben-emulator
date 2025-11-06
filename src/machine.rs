@@ -30,6 +30,13 @@ impl Memory {
         Some(())
     }
 
+    pub fn write_slice(&mut self, address: Address, value: &[u8]) -> Option<()> {
+        let range = (address as usize)..((address as usize) + value.len());
+        self.0
+            .get_mut(range)
+            .map(|dest| dest.copy_from_slice(value))
+    }
+
     pub fn as_raw(&self) -> &[u8; MEMORY_SIZE_BYTES] {
         &self.0
     }
@@ -52,7 +59,6 @@ impl ConditionRegisters {
     pub fn new() -> Self {
         Self { flags: [false; 5] }
     }
-
     fn condition_index(condition: ConditionRegister) -> usize {
         match condition {
             ConditionRegister::Carry => 0,
@@ -230,6 +236,10 @@ impl Machine {
 
     pub fn memory(&self) -> &Memory {
         &self.memory
+    }
+
+    pub fn memory_mut(&mut self) -> &mut Memory {
+        &mut self.memory
     }
 
     pub fn register_8(&self, register: Register) -> Data8 {

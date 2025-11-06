@@ -9,8 +9,10 @@ use crate::instruction::Address;
 pub struct MemoryView<'a> {
     memory: &'a [u8],
     shown_address: u16,
+    highlighted_address: Option<u16>,
     address_style: Style,
     data_style: Style,
+    highlighted_style: Style,
     label_style: Style,
 }
 
@@ -19,14 +21,21 @@ impl<'a> MemoryView<'a> {
         Self {
             memory,
             shown_address: 0,
+            highlighted_address: None,
             address_style: Style::default(),
             data_style: Style::default(),
+            highlighted_style: Style::default(),
             label_style: Style::default(),
         }
     }
 
     pub fn shown_address(mut self, address: Address) -> Self {
         self.shown_address = address;
+        self
+    }
+    
+    pub fn highlighted_address(mut self, address: Option<Address>) -> Self {
+        self.highlighted_address = address;
         self
     }
 
@@ -37,6 +46,11 @@ impl<'a> MemoryView<'a> {
 
     pub fn data_style(mut self, style: Style) -> Self {
         self.data_style = style;
+        self
+    }
+
+    pub fn highlighted_style(mut self, style: Style) -> Self {
+        self.highlighted_style = style;
         self
     }
 
@@ -112,9 +126,16 @@ impl<'a> Widget for MemoryView<'a> {
                 .chain(
                     (0..row_byte_count)
                         .map(|byte_index| {
+                            let offset = offset + byte_index;
+                            let style = if Some(offset) == self.highlighted_address {
+                                self.highlighted_style
+                            } else {
+                                self.data_style
+                            };
+                            
                             [Span::styled(
-                                format!("{:02x}", self.memory[(offset + byte_index) as usize]),
-                                self.data_style,
+                                format!("{:02x}", self.memory[offset as usize]),
+                                style,
                             )]
                         })
                         .collect::<Box<[_]>>()

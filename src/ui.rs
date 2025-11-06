@@ -21,7 +21,7 @@ use tui::{
 };
 
 use crate::{
-    instruction::{Data16, Register, RegisterPair},
+    instruction::{Register, RegisterPair},
     machine::{Machine, MachineState},
     ui::memory_view::MemoryView,
 };
@@ -80,6 +80,8 @@ static COLOR_PEACH: LazyLock<Color> = LazyLock::new(|| parse_hex("#fab387").unwr
 #[allow(unused)]
 static COLOR_RED: LazyLock<Color> = LazyLock::new(|| parse_hex("#f38ba8").unwrap());
 #[allow(unused)]
+static COLOR_MAROON: LazyLock<Color> = LazyLock::new(|| parse_hex("#eba0ac").unwrap());
+#[allow(unused)]
 static COLOR_LAVENDER: LazyLock<Color> = LazyLock::new(|| parse_hex("#b4befe").unwrap());
 
 static STYLE_BLOCK_BORDER: LazyLock<Style> =
@@ -97,6 +99,8 @@ static STYLE_LABEL: LazyLock<Style> = LazyLock::new(|| {
 });
 static STYLE_VALUE: LazyLock<Style> = LazyLock::new(|| Style::default().fg(*COLOR_PEACH));
 static STYLE_DATA: LazyLock<Style> = LazyLock::new(|| Style::default().fg(*COLOR_SUBTEXT_0));
+static STYLE_PC: LazyLock<Style> =
+    LazyLock::new(|| Style::default().fg(*COLOR_MAROON).add_modifier(Modifier::BOLD));
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 enum UiState {
@@ -175,9 +179,11 @@ impl Ui {
 
         let memory_view = MemoryView::new(self.machine.memory().as_raw())
             .shown_address(0)
+            .highlighted_address(Some(self.machine.pc().value()))
             .label_style(*STYLE_LABEL)
             .address_style(*STYLE_ADDRESS)
-            .data_style(*STYLE_DATA);
+            .data_style(*STYLE_DATA)
+            .highlighted_style(*STYLE_PC);
 
         f.render_widget(memory_view, widget_area);
     }
@@ -286,7 +292,7 @@ impl Ui {
             let pc = Paragraph::new(Spans::from(vec![
                 Span::styled("PC", *STYLE_LABEL),
                 Span::raw(": "),
-                Span::styled(format!("0x{:04x}", value.value()), *STYLE_VALUE),
+                Span::styled(format!("0x{:04x}", value.value()), *STYLE_PC),
             ]));
             f.render_widget(pc, block_area);
         }
