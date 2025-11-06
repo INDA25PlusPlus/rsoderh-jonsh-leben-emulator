@@ -6,13 +6,13 @@ use parsable::Parsable;
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Parsable)]
 pub enum Register {
     A(#[literal = b"A"] ()) = 0b111,
-    B(#[literal = b"A"] ()) = 0b000,
-    C(#[literal = b"A"] ()) = 0b001,
-    D(#[literal = b"A"] ()) = 0b010,
-    E(#[literal = b"A"] ()) = 0b011,
-    H(#[literal = b"A"] ()) = 0b100,
-    L(#[literal = b"A"] ()) = 0b101,
-    M(#[literal = b"A"] ()) = 0b110,
+    B(#[literal = b"B"] ()) = 0b000,
+    C(#[literal = b"C"] ()) = 0b001,
+    D(#[literal = b"D"] ()) = 0b010,
+    E(#[literal = b"E"] ()) = 0b011,
+    H(#[literal = b"H"] ()) = 0b100,
+    L(#[literal = b"L"] ()) = 0b101,
+    M(#[literal = b"M"] ()) = 0b110,
 }
 
 impl Register {

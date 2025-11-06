@@ -3,23 +3,24 @@ mod number;
 mod token;
 
 use std::fmt::Debug;
-use parsable::{CharLiteral, CharRange, EndOfStream, Ignore, Parsable, WithIndex, ZeroPlus};
+use parsable::{CharLiteral, CharRange, EndOfStream, Ignore, Parsable, WithIndex, ZeroPlus, ok_or_throw};
 
 use crate::assembler::{labels::Label, parse::{instruction::ParsedInstruction, number::LiteralNumber, token::{Colon, EndOfAssembly, Origin, Semicolon}}};
 
 #[derive(Clone, PartialEq, Eq, Parsable)]
 pub struct SourceFile {
     _0: WsNl,
-    comments: ZeroPlus<CommentOnlyLine>,
+    _1: ZeroPlus<CommentOnlyLine>,
     pub origin_line: Option<OriginLine>,
     pub lines: ZeroPlus<CodeLine>,
     end: EndOfAssemblyLine,
+    _2: ZeroPlus<CommentOnlyLine>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub struct CommentOnlyLine(CommentSegment, WsNl);
 
-#[derive(Clone, PartialEq, Eq, Parsable)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct OriginLine {
     pub label: Option<LabelSegment>,
     keyword: Origin,
@@ -28,20 +29,64 @@ pub struct OriginLine {
     _1: WsNl,
 }
 
+impl<'a> Parsable<'a> for OriginLine {
+    fn parse(stream: &mut parsable::ScopedStream<'a>) -> parsable::ParseOutcome<Self>
+    where
+        Self: Sized
+    {
+        stream.scope(|stream| {
+            Some(Ok(OriginLine {
+                label: ok_or_throw!(Option::<LabelSegment>::parse(stream)?),
+                keyword: ok_or_throw!(Origin::parse(stream)?),
+                _0: ok_or_throw!(Ws::parse_or_error(stream)),
+                address: ok_or_throw!(WithIndex::<LiteralNumber>::parse_or_error(stream)),
+                _1: ok_or_throw!(WsNl::parse_or_error(stream)),
+            }))
+        })
+    }
+
+    fn error() -> parsable::ParseError {
+        String::from("OriginLine")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub struct CodeLine {
-    pub label: Option<LabelSegment>,
-    pub code: Option<CodeSegment>,
-    comment: Option<CommentSegment>,
-    _0: Ws,
-    _1: Nl,
+    pub content: CodeLineContent,
+    _0: WsNl,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub enum CodeLineContent {
+    Labeled(LabelSegment, Option<CodeSegment>, Option<CommentSegment>),
+    NoLabel(CodeSegment, Option<CommentSegment>),
+    OnlyComment(CommentSegment),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub struct EndOfAssemblyLine(Option<LabelSegment>, EndOfAssembly, WsNl, EndOfStream);
 
-#[derive(Clone, PartialEq, Eq, Parsable)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct LabelSegment(pub WithIndex<Label>, Colon, Ws);
+
+impl<'a> Parsable<'a> for LabelSegment {
+    fn parse(stream: &mut parsable::ScopedStream<'a>) -> parsable::ParseOutcome<Self>
+    where
+        Self: Sized
+    {
+        stream.scope(|stream| {
+            Some(Ok(LabelSegment(
+                ok_or_throw!(WithIndex::<Label>::parse(stream)?),
+                ok_or_throw!(Colon::parse(stream)?),
+                ok_or_throw!(Ws::parse(stream)?),
+            )))
+        })
+    }
+
+    fn error() -> parsable::ParseError {
+        todo!()
+    }
+}
 
 impl Debug for LabelSegment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -93,4 +138,42 @@ pub type NonNlChar = Ignore<NonNlCharInner>;
 pub enum NonNlCharInner {
     Tab(CharLiteral<b'\t'>),
     Other(CharRange<b' ', b'~'>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parsable::*;
+
+    #[test]
+    fn option() {
+        #[derive(Parsable)]
+        struct A {
+            x: Option<CharLiteral<b'x'>>,
+            y: CharLiteral<b'y'>,
+            end: EndOfStream,
+        }
+
+        #[derive(Parsable)]
+        struct B {
+            x: CharLiteral<b'x'>,
+            y: Option<CharLiteral<b'y'>>,
+            end: EndOfStream,
+        }
+
+        let source_1 = b"xy";
+        let source_2 = b"x";
+        let source_3 = b"y";
+        let source_4 = b"yx";
+
+        assert!(matches!(A::parse(&mut ScopedStream::new(source_1)), Some(Ok(..))));
+        assert!(matches!(A::parse(&mut ScopedStream::new(source_2)), Some(Err(..))));
+        assert!(matches!(A::parse(&mut ScopedStream::new(source_3)), Some(Ok(..))));
+        assert!(matches!(A::parse(&mut ScopedStream::new(source_4)), Some(Err(..))));
+
+        assert!(matches!(B::parse(&mut ScopedStream::new(source_1)), Some(Ok(..))));
+        assert!(matches!(B::parse(&mut ScopedStream::new(source_2)), Some(Ok(..))));
+        assert!(matches!(B::parse(&mut ScopedStream::new(source_3)), None));
+        assert!(matches!(B::parse(&mut ScopedStream::new(source_4)), None));
+    }
 }

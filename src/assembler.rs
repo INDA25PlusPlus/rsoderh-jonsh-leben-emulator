@@ -1,8 +1,7 @@
 use parsable::{Parsable, format_error_stack};
-use std::io::Write;
 
 use crate::{
-    assembler::{labels::{Label, LabelLookup}, parse::{LabelSegment, SourceFile}},
+    assembler::{labels::{Label, LabelLookup}, parse::{CodeLineContent, CodeSegment, LabelSegment, SourceFile}},
     instruction::{Address, InstructionOrData},
 };
 
@@ -48,10 +47,33 @@ pub fn parse_assembly(
         source_file.origin_line.as_ref().map(|origin_line| origin_line.label.as_ref()).flatten(),
         current_address,
     )?;
+
+    fn get_label(content: &CodeLineContent) -> Option<&LabelSegment> {
+        match &content {
+            CodeLineContent::Labeled(label_segment, ..) => Some(label_segment),
+            _ => None,
+        }
+    }
+
+    fn get_code(content: &CodeLineContent) -> Option<&CodeSegment> {
+        match &content {
+            CodeLineContent::Labeled(_, code_segment, ..) => code_segment.as_ref(),
+            CodeLineContent::NoLabel(code_segment, ..) => Some(code_segment),
+            _ => None,
+        }
+    }
+
+    fn get_code_owned(content: CodeLineContent) -> Option<CodeSegment> {
+        match content {
+            CodeLineContent::Labeled(_, code_segment, ..) => code_segment,
+            CodeLineContent::NoLabel(code_segment, ..) => Some(code_segment),
+            _ => None,
+        }
+    }
     
     for code_line in &source_file.lines.nodes {
-        add_label_segment_opt(code_line.label.as_ref(), current_address)?;
-        if let Some(code) = &code_line.code {
+        add_label_segment_opt(get_label(&code_line.content), current_address)?;
+        if let Some(code) = get_code(&code_line.content) {
             let instruction = &code.instruction;
             current_address = current_address.checked_add(instruction.node.instruction_length())
                 .ok_or(format!("{}: Memory size overflowed", instruction.index))?;
@@ -60,11 +82,44 @@ pub fn parse_assembly(
 
     let mut instructions = Vec::new();
     for code_line in source_file.lines.nodes {
-        if let Some(code) = code_line.code {
+        if let Some(code) = get_code_owned(code_line.content) {
             let instruction = code.instruction.node.into_inner(&labels)
                 .ok_or(format!("{}: Unknown label", code.instruction.index))?;
             instructions.push(InstructionOrData::Instruction(instruction));
         }
     }
     Ok((instructions, origin_address))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::instruction::{Instruction, Register};
+
+    use super::*;
+
+    #[test]
+    fn parse_1() {
+        let source = b"
+                            ; This is a comment
+                ORG 10H     ; This is a comment
+
+                
+                
+                MOV A, B
+                JMP TEST    ; Jump to subroutine
+        
+        TEST:   MOV B, A    ; Moves A into B
+        
+                            ; This is an error; `END` is missing
+                END
+        ";
+
+        let (instructions, start) = parse_assembly(source).expect("Failed to parse program");
+        assert_eq!(instructions, vec![
+            InstructionOrData::Instruction(Instruction::Mov(Register::A(()), Register::B(()))),
+            InstructionOrData::Instruction(Instruction::Jmp(20)),
+            InstructionOrData::Instruction(Instruction::Mov(Register::B(()), Register::A(()))),
+        ]);
+        assert_eq!(start, 16);
+    }
 }

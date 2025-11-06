@@ -16,7 +16,7 @@ impl LabelLookup {
     }
 
     fn to_label_ident(label: &Label) -> Vec<u8> {
-        label.span[..label.span.len().max(5)].to_owned()
+        label.span[..label.span.len().min(5)].to_owned()
     }
 
     pub fn insert(&mut self, label: Label, address: Address) -> Result<(), ()> {

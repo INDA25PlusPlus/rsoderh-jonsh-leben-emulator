@@ -321,7 +321,7 @@ dependencies = [
 [[package]]
 name = "parsable"
 version = "0.1.0"
-source = "git+https://github.com/LeonardBengtsson/parsing-library?rev=fd28142#fd28142a4af321f69a3e8ad30761b59a8da79136"
+source = "git+https://github.com/LeonardBengtsson/parsing-library#dae65e1618109238c63a335d395a671ff915979b"
 dependencies = [
  "parsable-derive",
  "serde",
@@ -330,7 +330,7 @@ dependencies = [
 [[package]]
 name = "parsable-derive"
 version = "0.1.0"
-source = "git+https://github.com/LeonardBengtsson/parsing-library?rev=fd28142#fd28142a4af321f69a3e8ad30761b59a8da79136"
+source = "git+https://github.com/LeonardBengtsson/parsing-library#dae65e1618109238c63a335d395a671ff915979b"
 dependencies = [
  "proc-macro2",
  "quote",
