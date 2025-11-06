@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::{Add, AddAssign}};
+use std::{fmt::Display, ops::{Add, Sub}};
 
 use parsable::Parsable;
 
@@ -138,6 +138,14 @@ impl Data16 {
     pub fn value(&self) -> u16 {
         self.low as u16 + ((self.high as u16) << 8)
     }
+    
+    pub fn checked_add(&self, rhs: u16) -> Option<Self> {
+        self.value().checked_add(rhs).map(Self::from)
+    }
+    
+    pub fn checked_sub(&self, rhs: u16) -> Option<Self> {
+        self.value().checked_sub(rhs).map(Self::from)
+    }
 }
 
 impl From<u16> for Data16 {
@@ -159,6 +167,20 @@ impl Add for Data16 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         (self.value() + rhs.value()).into()
+    }
+}
+
+impl Add<u16> for Data16 {
+    type Output = Self;
+    fn add(self, rhs: u16) -> Self::Output {
+        (self.value() + rhs).into()
+    }
+}
+
+impl Sub<u16> for Data16 {
+    type Output = Self;
+    fn sub(self, rhs: u16) -> Self::Output {
+        (self.value() - rhs).into()
     }
 }
 

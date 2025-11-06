@@ -1,6 +1,9 @@
 use crate::{
     coding::{self, reader::Reader},
-    instruction::{Address, Data8, Data16, Instruction, Register, RegisterPair},
+    instruction::{
+        Address, Condition, Data8, Data16, Instruction, Register, RegisterPair,
+        RegisterPairOrStatus,
+    },
 };
 
 static MEMORY_SIZE_BYTES: usize = 2 << 16;
@@ -23,6 +26,7 @@ impl Memory {
     pub fn write_8(&mut self, address: Address, value: Data8) {
         self.0[address as usize] = value;
     }
+    #[must_use]
     pub fn write_16(&mut self, address: Address, value: Data16) -> Option<()> {
         self.0[address as usize] = value.low;
         *self.0.get_mut(address as usize + 1)? = value.high;
@@ -194,10 +198,17 @@ impl RegisterMap {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum HaltReason {
+    Instruction,
+    InvalidInstruction,
+    StackOverflow,
+    StackUnderflow,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MachineState {
     Running,
-    Halted,
-    InvalidInstruction,
+    Halted(HaltReason),
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -205,6 +216,9 @@ pub enum ExecutionResult {
     Running,
     ControlTransfer,
     Halt,
+    StackOverflow,
+    // Is generated when the stack is popped too many times.
+    StackUnderflow,
 }
 
 pub struct Machine {
@@ -237,7 +251,7 @@ impl Machine {
     pub fn memory(&self) -> &Memory {
         &self.memory
     }
-
+    
     pub fn memory_mut(&mut self) -> &mut Memory {
         &mut self.memory
     }
@@ -254,10 +268,31 @@ impl Machine {
         self.pc
     }
 
+    #[must_use]
+    pub fn stack_push(&mut self, data: Data16) -> Option<()> {
+        let new_sp = self.register_16(RegisterPair::Sp(())).checked_sub(2)?;
+
+        self.memory.write_16(new_sp.value(), data)?;
+        self.registers.set_16(RegisterPair::Sp(()), new_sp);
+
+        Some(())
+    }
+
+    pub fn stack_pop(&mut self) -> Option<Data16> {
+        let value = self
+            .memory
+            .read_16(self.register_16(RegisterPair::Sp(())).value())?;
+        self.registers.set_16(
+            RegisterPair::Sp(()),
+            self.register_16(RegisterPair::Sp(())).checked_add(2)?,
+        );
+
+        Some(value)
+    }
+
     pub fn run_cycle(&mut self) {
         match self.state {
-            MachineState::Halted => {}
-            MachineState::InvalidInstruction => {}
+            MachineState::Halted(_) => {}
             MachineState::Running => {
                 self.state = self.load_execute();
             }
@@ -268,17 +303,21 @@ impl Machine {
         let mut stream = Reader::new(&self.memory().0[self.pc().value() as usize..]);
 
         let Some(instruction) = coding::decode(&mut stream) else {
-            return MachineState::InvalidInstruction;
+            return MachineState::Halted(HaltReason::InvalidInstruction);
         };
         let instruction_len = stream.read_amount_bytes();
 
-        match self.execute(instruction) {
-            ExecutionResult::Running => {
-                self.pc = (self.pc.value() + instruction_len as u16).into();
-                MachineState::Running
-            }
+        let result = self.execute(instruction);
+        if matches!(result, ExecutionResult::Running | ExecutionResult::Halt) {
+            self.pc = (self.pc.value() + instruction_len as u16).into();
+        }
+
+        match result {
+            ExecutionResult::Running => MachineState::Running,
             ExecutionResult::ControlTransfer => MachineState::Running,
-            ExecutionResult::Halt => MachineState::Halted,
+            ExecutionResult::Halt => MachineState::Halted(HaltReason::Instruction),
+            ExecutionResult::StackOverflow => MachineState::Halted(HaltReason::StackOverflow),
+            ExecutionResult::StackUnderflow => MachineState::Halted(HaltReason::StackUnderflow),
         }
     }
 
@@ -389,20 +428,123 @@ impl Machine {
             Instruction::Cma => unimplemented!(),
             Instruction::Cmc => unimplemented!(),
             Instruction::Stc => unimplemented!(),
-            Instruction::Jmp(_data) => unimplemented!(),
-            Instruction::Jcc(_condition, _data) => unimplemented!(),
-            Instruction::Call(_data) => unimplemented!(),
-            Instruction::Ccc(_condition, _data) => unimplemented!(),
-            Instruction::Ret => unimplemented!(),
-            Instruction::Rcc(_condition) => unimplemented!(),
+            Instruction::Jmp(address) => {
+                self.pc = address.into();
+                ExecutionResult::ControlTransfer
+            }
+            Instruction::Jcc(condition, address) => {
+                let should_jump = match condition {
+                    Condition::Carry => self.conditions.get(ConditionRegister::Carry),
+                    Condition::NoCarry => !self.conditions.get(ConditionRegister::Carry),
+                    Condition::Zero => self.conditions.get(ConditionRegister::Zero),
+                    Condition::NoZero => !self.conditions.get(ConditionRegister::Zero),
+                    Condition::Minus => self.conditions.get(ConditionRegister::Sign),
+                    Condition::Positive => !self.conditions.get(ConditionRegister::Sign),
+                    Condition::ParityEven => self.conditions.get(ConditionRegister::Parity),
+                    Condition::ParityOdd => !self.conditions.get(ConditionRegister::Parity),
+                };
+                if should_jump {
+                    self.pc = address.into();
+                    ExecutionResult::ControlTransfer
+                } else {
+                    ExecutionResult::Running
+                }
+            }
+            Instruction::Call(address) => {
+                if self.stack_push(self.pc).is_some() {
+                    self.pc = address.into();
+                    ExecutionResult::ControlTransfer
+                } else {
+                    ExecutionResult::StackOverflow
+                }
+            }
+            Instruction::Ccc(condition, address) => {
+                let should_call = match condition {
+                    Condition::Carry => self.conditions.get(ConditionRegister::Carry),
+                    Condition::NoCarry => !self.conditions.get(ConditionRegister::Carry),
+                    Condition::Zero => self.conditions.get(ConditionRegister::Zero),
+                    Condition::NoZero => !self.conditions.get(ConditionRegister::Zero),
+                    Condition::Minus => self.conditions.get(ConditionRegister::Sign),
+                    Condition::Positive => !self.conditions.get(ConditionRegister::Sign),
+                    Condition::ParityEven => self.conditions.get(ConditionRegister::Parity),
+                    Condition::ParityOdd => !self.conditions.get(ConditionRegister::Parity),
+                };
+                if should_call && self.stack_push(self.pc).is_some() {
+                    self.pc = address.into();
+                    ExecutionResult::ControlTransfer
+                } else {
+                    ExecutionResult::Running
+                }
+            }
+            Instruction::Ret => match self.stack_pop() {
+                Some(address) => {
+                    self.pc = address;
+                    ExecutionResult::Running
+                }
+                None => ExecutionResult::StackUnderflow,
+            },
+            Instruction::Rcc(condition) => {
+                let should_return = match condition {
+                    Condition::Carry => self.conditions.get(ConditionRegister::Carry),
+                    Condition::NoCarry => !self.conditions.get(ConditionRegister::Carry),
+                    Condition::Zero => self.conditions.get(ConditionRegister::Zero),
+                    Condition::NoZero => !self.conditions.get(ConditionRegister::Zero),
+                    Condition::Minus => self.conditions.get(ConditionRegister::Sign),
+                    Condition::Positive => !self.conditions.get(ConditionRegister::Sign),
+                    Condition::ParityEven => self.conditions.get(ConditionRegister::Parity),
+                    Condition::ParityOdd => !self.conditions.get(ConditionRegister::Parity),
+                };
+
+                if should_return {
+                    match self.stack_pop() {
+                        Some(address) => {
+                            self.pc = address;
+                            ExecutionResult::Running
+                        }
+                        None => ExecutionResult::StackUnderflow,
+                    }
+                } else {
+                    ExecutionResult::Running
+                }
+            }
             Instruction::Rst(_restart_number) => unimplemented!(),
-            Instruction::Pchl => unimplemented!(),
-            Instruction::Push(_register_pair_or_status) => unimplemented!(),
-            Instruction::Pop(_register_pair_or_status) => unimplemented!(),
+            Instruction::Pchl => {
+                self.pc = self.register_16(RegisterPair::Hl(()));
+                ExecutionResult::ControlTransfer
+            }
+            Instruction::Push(register_pair_or_status) => {
+                let register = match register_pair_or_status {
+                    RegisterPairOrStatus::Bc(..) => RegisterPair::Bc(()),
+                    RegisterPairOrStatus::De(..) => RegisterPair::De(()),
+                    RegisterPairOrStatus::Hl(..) => RegisterPair::Hl(()),
+                    RegisterPairOrStatus::StatusWord(..) => unimplemented!(),
+                };
+                match self.stack_push(self.register_16(register)) {
+                    Some(()) => ExecutionResult::Running,
+                    None => ExecutionResult::StackOverflow,
+                }
+            }
+            Instruction::Pop(register_pair_or_status) => {
+                let register = match register_pair_or_status {
+                    RegisterPairOrStatus::Bc(..) => RegisterPair::Bc(()),
+                    RegisterPairOrStatus::De(..) => RegisterPair::De(()),
+                    RegisterPairOrStatus::Hl(..) => RegisterPair::Hl(()),
+                    RegisterPairOrStatus::StatusWord(..) => unimplemented!(),
+                };
+                match self.stack_pop() {
+                    Some(value) => {
+                        self.registers.set_16(register, value);
+                        ExecutionResult::Running
+                    }
+                    None => ExecutionResult::StackOverflow,
+                }
+            }
             Instruction::Xthl => unimplemented!(),
             Instruction::Sphl => unimplemented!(),
+            // We don't support io
             Instruction::In(_) => unimplemented!(),
             Instruction::Out(_) => unimplemented!(),
+            // We don't support interrupts
             Instruction::Ei => unimplemented!(),
             Instruction::Di => unimplemented!(),
             Instruction::Hlt => ExecutionResult::Halt,
