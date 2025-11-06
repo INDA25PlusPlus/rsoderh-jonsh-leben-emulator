@@ -50,30 +50,30 @@ impl RegisterMap {
 
     pub fn get_8(&self, register: Register, memory: &Memory) -> Data8 {
         match register {
-            Register::B => {
+            Register::B(..) => {
                 return self.b;
             }
-            Register::C => {
+            Register::C(..) => {
                 return self.c;
             }
-            Register::D => {
+            Register::D(..) => {
                 return self.d;
             }
-            Register::E => {
+            Register::E(..) => {
                 return self.e;
             }
-            Register::H => {
+            Register::H(..) => {
                 return self.h;
             }
-            Register::L => {
+            Register::L(..) => {
                 return self.l;
             }
-            Register::M => {
-                let address = self.get_16(RegisterPair::Hl);
+            Register::M(..) => {
+                let address = self.get_16(RegisterPair::Hl(()));
 
                 return memory.read_u8(address);
             }
-            Register::A => {
+            Register::A(..) => {
                 return self.a;
             }
         }
@@ -81,10 +81,10 @@ impl RegisterMap {
 
     pub fn get_16(&self, register: RegisterPair) -> Data16 {
         match register {
-            RegisterPair::Bc => Data16::new(self.c, self.b),
-            RegisterPair::De => Data16::new(self.e, self.d),
-            RegisterPair::Hl => Data16::new(self.l, self.h),
-            RegisterPair::Sp => self.sp,
+            RegisterPair::Bc(..) => Data16::new(self.c, self.b),
+            RegisterPair::De(..) => Data16::new(self.e, self.d),
+            RegisterPair::Hl(..) => Data16::new(self.l, self.h),
+            RegisterPair::Sp(..) => self.sp,
         }
     }
 }

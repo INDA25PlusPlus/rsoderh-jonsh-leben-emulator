@@ -1,13 +1,18 @@
 use std::io::Write;
-use crate::{assembler::reader::Reader, instruction::{Address, Instruction}};
+use parsable::Parsable;
 
+use crate::{assembler::{parse::SourceFile, reader::Reader}, instruction::{Address, Instruction}};
+
+mod labels;
 mod parse;
 mod reader;
 
 pub type AssemblySource<'a> = &'a [u8];
 
 pub fn parse_instructions(source: AssemblySource, program_address: Address) -> Option<Vec<Instruction>> {
-    let mut reader = Reader::new(source);
+    let mut stream = parsable::ScopedStream::new(source);
+    let outcome = parsable::WithEnd::<SourceFile>::parse(&mut stream);
+    
     loop {
         todo!()
     }

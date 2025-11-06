@@ -1,4 +1,4 @@
-use crate::{assembler::parse::Label, instruction::{Register, RegisterPair}};
+use crate::instruction::{Register, RegisterPair};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ReadError<'c> {
@@ -6,6 +6,8 @@ pub enum ReadError<'c> {
     UnexpectedChar(u8),
     UnexpectedSlice(&'c [u8]),
 }
+
+type Label<'a> = &'a [u8];
 
 pub type ReadResult<'c, T> = Result<T, ReadError<'c>>;
 
@@ -192,23 +194,23 @@ impl<'a> Reader<'a> {
 
     pub fn expect_register<'b>(&'b mut self) -> ReadResult<'a, Register> {
         parse_alternatives!(self,
-            b"B", Register::B,
-            b"C", Register::C,
-            b"D", Register::D,
-            b"E", Register::E,
-            b"H", Register::H,
-            b"L", Register::L,
-            b"M", Register::M,
-            b"A", Register::A,
+            b"B", Register::B(()),
+            b"C", Register::C(()),
+            b"D", Register::D(()),
+            b"E", Register::E(()),
+            b"H", Register::H(()),
+            b"L", Register::L(()),
+            b"M", Register::M(()),
+            b"A", Register::A(()),
         )
     }
 
     pub fn expect_register_pair<'b>(&'b mut self) -> ReadResult<'a, RegisterPair> {
         parse_alternatives!(self,
-            b"BC", RegisterPair::Bc,
-            b"DE", RegisterPair::De,
-            b"HL", RegisterPair::Hl,
-            b"SP", RegisterPair::Sp,
+            b"BC", RegisterPair::Bc(()),
+            b"DE", RegisterPair::De(()),
+            b"HL", RegisterPair::Hl(()),
+            b"SP", RegisterPair::Sp(()),
         )
     }
 

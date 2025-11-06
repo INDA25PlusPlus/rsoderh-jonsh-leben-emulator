@@ -1,49 +1,51 @@
 use std::{fmt::Display, ops::Add};
 
+use parsable::Parsable;
+
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Parsable)]
 pub enum Register {
-    A = 0b111,
-    B = 0b000,
-    C = 0b001,
-    D = 0b010,
-    E = 0b011,
-    H = 0b100,
-    L = 0b101,
-    M = 0b110,
+    A(#[literal = b"A"] ()) = 0b111,
+    B(#[literal = b"A"] ()) = 0b000,
+    C(#[literal = b"A"] ()) = 0b001,
+    D(#[literal = b"A"] ()) = 0b010,
+    E(#[literal = b"A"] ()) = 0b011,
+    H(#[literal = b"A"] ()) = 0b100,
+    L(#[literal = b"A"] ()) = 0b101,
+    M(#[literal = b"A"] ()) = 0b110,
 }
 
 impl Display for Register {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Register::B => "B",
-            Register::C => "C",
-            Register::D => "D",
-            Register::E => "E",
-            Register::H => "H",
-            Register::L => "L",
-            Register::M => "M",
-            Register::A => "A",
+            Register::B(..) => "B",
+            Register::C(..) => "C",
+            Register::D(..) => "D",
+            Register::E(..) => "E",
+            Register::H(..) => "H",
+            Register::L(..) => "L",
+            Register::M(..) => "M",
+            Register::A(..) => "A",
         })
     }
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Parsable)]
 pub enum RegisterPair {
-    Bc = 0b00,
-    De = 0b01,
-    Hl = 0b10,
-    Sp = 0b11,
+    Bc(#[literal = b"B"] ()) = 0b00,
+    De(#[literal = b"B"] ()) = 0b01,
+    Hl(#[literal = b"B"] ()) = 0b10,
+    Sp(#[literal = b"B"] ()) = 0b11,
 }
 
 impl Display for RegisterPair {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            RegisterPair::Bc => "BC",
-            RegisterPair::De => "DE",
-            RegisterPair::Hl => "HL",
-            RegisterPair::Sp => "SP",
+            RegisterPair::Bc(..) => "BC",
+            RegisterPair::De(..) => "DE",
+            RegisterPair::Hl(..) => "HL",
+            RegisterPair::Sp(..) => "SP",
         })
     }
 }
