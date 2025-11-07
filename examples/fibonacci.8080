@@ -1,14 +1,14 @@
 ;
-; Print out the first 20 fibonacci numbers
+; Print out the first 12 fibonacci numbers
 ;
 
         ORG 0
 
 START:  
-        MVI A, 0
+        MVI A, 1
         MVI B, 1
-        MVI D, 0        ; D ticks down from 20
-        MVI E, 20
+        MVI D, 1        ; D ticks up to 12
+        MVI E, 12
 
 LOOP:   
         OUT 1           ; print decimal format
@@ -29,7 +29,7 @@ LOOP:
         MOV A, B        ; swap A, B
         MOV B, C
 
-        DCR D           ; D--
+        INR D           ; D++
         JMP LOOP
 
 STOP:
