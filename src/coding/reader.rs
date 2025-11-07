@@ -1,16 +1,3 @@
-use crate::instruction::{Register, RegisterPair};
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ReadError<'c> {
-    EndOfBuffer,
-    UnexpectedChar(u8),
-    UnexpectedSlice(&'c [u8]),
-}
-
-type Label<'a> = &'a [u8];
-
-pub type ReadResult<'c, T> = Result<T, ReadError<'c>>;
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Reader<'a> {
     original: &'a [u8],
