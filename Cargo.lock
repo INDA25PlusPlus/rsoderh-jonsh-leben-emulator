@@ -365,7 +365,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rsoderh-nhg-leben-emulator"
+name = "rsoderh-jonsh-leben-emulator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
