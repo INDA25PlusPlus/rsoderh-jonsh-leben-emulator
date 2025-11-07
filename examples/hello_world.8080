@@ -1,0 +1,27 @@
+;
+; Print 'Hello, World!'
+;
+
+START:
+    MVI A, 0
+    MVI E, 0
+    MVI L, 11H  ; Start of string
+
+LOOP:
+    MOV A, M    ; Read byte
+    OUT 0       ; Print char
+
+    CMP E
+    JZ STOP     ; If null byte, stop
+
+    INR L       ; Pointer++
+    JMP LOOP
+
+STR:
+    DB 'Hello, World!'
+    NOP         ; Can't currently encode null byte, so use
+                ; NOP = 0
+
+STOP:
+    JMP STOP    ; Halt instruction doesn't work lol
+    END
