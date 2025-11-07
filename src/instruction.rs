@@ -134,6 +134,13 @@ impl RegisterPairIndirect {
             Self::De => 0b01,
         }
     }
+
+    pub fn to_register_pair(&self) -> RegisterPair {
+        match self {
+            RegisterPairIndirect::Bc => RegisterPair::Bc,
+            RegisterPairIndirect::De => RegisterPair::De,
+        }
+    }
 }
 
 impl TryFrom<u8> for RegisterPairIndirect {
@@ -160,7 +167,6 @@ pub enum RegisterPairOrStatus {
     StatusWord = 0b11,
 }
 
-
 impl RegisterPairOrStatus {
     pub fn repr(&self) -> u8 {
         match self{
@@ -168,6 +174,15 @@ impl RegisterPairOrStatus {
             Self::De => 0b01,
             Self::Hl => 0b10,
             Self::StatusWord => 0b11,
+        }
+    }
+
+    pub fn to_register_pair(&self) -> Option<RegisterPair> {
+        match self {
+            RegisterPairOrStatus::Bc => Some(RegisterPair::Bc),
+            RegisterPairOrStatus::De => Some(RegisterPair::De),
+            RegisterPairOrStatus::Hl => Some(RegisterPair::Hl),
+            RegisterPairOrStatus::StatusWord => None,
         }
     }
 }
@@ -294,6 +309,21 @@ pub enum RestartNumber {
     R5 = 0b101,
     R6 = 0b110,
     R7 = 0b111,
+}
+
+impl From<RestartNumber> for u16 {
+    fn from(value: RestartNumber) -> Self {
+        match value {
+            RestartNumber::R0 => 0,
+            RestartNumber::R1 => 1,
+            RestartNumber::R2 => 2,
+            RestartNumber::R3 => 3,
+            RestartNumber::R4 => 4,
+            RestartNumber::R5 => 5,
+            RestartNumber::R6 => 6,
+            RestartNumber::R7 => 7,
+        }
+    }
 }
 
 impl TryFrom<u8> for RestartNumber {

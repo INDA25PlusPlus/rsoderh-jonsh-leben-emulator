@@ -205,6 +205,7 @@ pub enum HaltReason {
     InvalidInstruction,
     StackOverflow,
     StackUnderflow,
+    MemoryOverflow,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -221,6 +222,8 @@ pub enum ExecutionResult {
     StackOverflow,
     // Is generated when the stack is popped too many times.
     StackUnderflow,
+    // When an instruction attempts to write a 16-bit value to the very last byte of memory
+    MemoryOverflow,
 }
 
 pub struct Machine {
@@ -302,6 +305,42 @@ impl Machine {
         Some(value)
     }
 
+    fn get_status_word(&self) -> Data16 {
+        let cy_flag = self.conditions.get(ConditionRegister::Carry) as u8;
+        let p_flag = self.conditions.get(ConditionRegister::Parity) as u8;
+        let ac_flag = self.conditions.get(ConditionRegister::AuxiliaryCarry) as u8;
+        let z_flag = self.conditions.get(ConditionRegister::Zero) as u8;
+        let s_flag = self.conditions.get(ConditionRegister::Sign) as u8;
+        let low = 0b0000_0000
+            | cy_flag
+            | (1 << 1)
+            | (p_flag << 2)
+            | (0 << 3)
+            | (ac_flag << 4)
+            | (0 << 5)
+            | (z_flag << 6)
+            | (s_flag << 7);
+        let high = self.registers.get_8(Register::A, &self.memory);
+        Data16 { low, high }
+    }
+    
+    fn set_status_word(&mut self, data: Data16) {
+        let Data16 { low, high } = data;
+
+        let cy_flag = low & 0b0000_0001;
+        let p_flag = (low >> 2) & 0b0000_0001;
+        let ac_flag = (low >> 4) & 0b0000_0001;
+        let z_flag = (low >> 6) & 0b0000_0001;
+        let s_flag = (low >> 7) & 0b0000_0001;
+        self.conditions.set(ConditionRegister::Carry, cy_flag == 1);
+        self.conditions.set(ConditionRegister::Parity, p_flag == 1);
+        self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag == 1);
+        self.conditions.set(ConditionRegister::Zero, z_flag == 1);
+        self.conditions.set(ConditionRegister::Sign, s_flag == 1);
+
+        self.registers.set_8(Register::A, high, &mut self.memory);
+    }
+
     pub fn run_cycle(&mut self) {
         match self.state {
             MachineState::Halted(_) => {}
@@ -330,6 +369,7 @@ impl Machine {
             ExecutionResult::Halt => MachineState::Halted(HaltReason::HaltInstruction),
             ExecutionResult::StackOverflow => MachineState::Halted(HaltReason::StackOverflow),
             ExecutionResult::StackUnderflow => MachineState::Halted(HaltReason::StackUnderflow),
+            ExecutionResult::MemoryOverflow => MachineState::Halted(HaltReason::MemoryOverflow),
         }
     }
     
@@ -356,340 +396,520 @@ impl Machine {
                 self.registers.set_16(register_pair, data);
                 ExecutionResult::Running
             }
-            Instruction::Lda(_data) => unimplemented!(),
-            Instruction::Sta(_data) => unimplemented!(),
-            Instruction::Lhld(_data) => unimplemented!(),
-            Instruction::Shld(_data) => unimplemented!(),
-            Instruction::Ldax(_register_pair_indirect) => unimplemented!(),
-            Instruction::Stax(_register_pair_indirect) => unimplemented!(),
-            Instruction::Xchg => unimplemented!(),
+            Instruction::Lda(address) => {
+                let mem = self.memory.read_8(address);
+                self.registers.set_8(Register::A, mem, &mut self.memory);
+                ExecutionResult::Running
+            },
+            Instruction::Sta(address) => {
+                let a = self.registers.get_8(Register::A, &self.memory);
+                self.memory.write_8(address, a);
+                ExecutionResult::Running
+            },
+            Instruction::Lhld(address) => {
+                let Some(mem) = self.memory.read_16(address) else {
+                    return ExecutionResult::MemoryOverflow;
+                };
+                self.registers.set_16(RegisterPair::Hl, mem);
+                ExecutionResult::Running
+            },
+            Instruction::Shld(address) => {
+                let hl = self.registers.get_16(RegisterPair::Hl);
+                let res = self.memory.write_16(address, hl);
+                if matches!(res, None) { return ExecutionResult::MemoryOverflow }
+                ExecutionResult::Running
+            },
+            Instruction::Ldax(register_pair_indirect) => {
+                let address = self.registers.get_16(register_pair_indirect.to_register_pair());
+                let mem = self.memory.read_8(address.into());
+                self.registers.set_8(Register::A, mem, &mut self.memory);
+                ExecutionResult::Running
+            },
+            Instruction::Stax(register_pair_indirect) => {
+                let address = self.registers.get_16(register_pair_indirect.to_register_pair());
+                let a = self.registers.get_8(Register::A, &self.memory);
+                self.memory.write_8(address.into(), a);
+                ExecutionResult::Running
+            },
+            Instruction::Xchg => {
+                let hl = self.registers.get_16(RegisterPair::Hl);
+                let de = self.registers.get_16(RegisterPair::De);
+                self.registers.set_16(RegisterPair::De, hl);
+                self.registers.set_16(RegisterPair::Hl, de);
+                ExecutionResult::Running
+            },
             Instruction::Add(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let value = self.registers.get_8(register, &self.memory);
-                let result = a.wrapping_add(value);
-                if result < a.max(value) {
-                    self.conditions.set(ConditionRegister::Carry, true);
-                } else {
-                    self.conditions.set(ConditionRegister::Carry, false);
-                }
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+                let term = self.registers.get_8(register, &self.memory);
+                
+                let result = (a as u16) + (term as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term, false);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
-            Instruction::Adi(data) => {
+            Instruction::Adi(term) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let result = a.wrapping_add(data);
-                if result < a.max(data) {
-                    self.conditions.set(ConditionRegister::Carry, true);
-                }
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+                
+                let result = (a as u16) + (term as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term, false);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
             Instruction::Adc(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let value = self.registers.get_8(register, &self.memory);
-                let (mut result, overflow_1) = a.overflowing_add(value);
-                let mut overflow_2 = false;
-                if self.conditions.get(ConditionRegister::Carry) {
-                    (result, overflow_2) = result.overflowing_add(1);
-                }
-                self.conditions
-                    .set(ConditionRegister::Carry, overflow_1 || overflow_2);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+                let term = self.registers.get_8(register, &self.memory);
+                
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let result = (a as u16) + (term as u16) + (cy_flag as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term, cy_flag);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
-            Instruction::Aci(data) => {
+            Instruction::Aci(term) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let (mut result, overflow_1) = a.overflowing_add(data);
-                let mut overflow_2 = false;
-                if self.conditions.get(ConditionRegister::Carry) {
-                    (result, overflow_2) = result.overflowing_add(1);
-                }
-                self.conditions
-                    .set(ConditionRegister::Carry, overflow_1 || overflow_2);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+                
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let result = (a as u16) + (term as u16) + (cy_flag as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term, cy_flag);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
             Instruction::Sub(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let value = self.register_8(register);
-                let (result, overflow) = a.overflowing_sub(value);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Carry, overflow);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+                let term = self.registers.get_8(register, &self.memory);
+
+                let term_complement = (!term).wrapping_add(1);
+                
+                let result = (a as u16) + (term_complement as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term_complement, false);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
-            Instruction::Sui(data) => {
+            Instruction::Sui(term) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let (result, overflow) = a.overflowing_sub(data);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Carry, overflow);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+
+                let term_complement = (!term).wrapping_add(1);
+                
+                let result = (a as u16) + (term_complement as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term_complement, false);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
             Instruction::Sbb(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let mut value = self.register_8(register);
-                if self.conditions.get(ConditionRegister::Carry) {
-                    value = value.wrapping_add(1);
-                }
-                let (result, overflow) = a.overflowing_sub(value);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Carry, overflow);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+                let term = self.registers.get_8(register, &self.memory);
+
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let (term, borrow) = term.overflowing_add(cy_flag as u8);
+                let term_complement = (!term).wrapping_add(1);
+                
+                let result = (a as u16) + (term_complement as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term_complement, false);
+                let cy_flag = (result >> 8) & 0b1 == 1 || borrow;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
-            Instruction::Sbi(data) => {
+            Instruction::Sbi(term) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let (mut result, overflow1) = a.overflowing_sub(data);
-                let mut overflow2 = false;
-                if self.conditions.get(ConditionRegister::Carry) {
-                    (result, overflow2) = result.overflowing_add(1);
-                }
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions
-                    .set(ConditionRegister::Carry, overflow1 || overflow2);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
-                self.conditions.set(ConditionRegister::Zero, result == 0);
+
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let (term, borrow) = term.overflowing_add(cy_flag as u8);
+                let term_complement = (!term).wrapping_add(1);
+                
+                let result = (a as u16) + (term_complement as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term_complement, false);
+                let cy_flag = (result >> 8) & 0b1 == 1 || borrow;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
             Instruction::Inr(register) => {
-                self.registers.set_8(
-                    register,
-                    self.registers.get_8(register, &self.memory).wrapping_add(1),
-                    &mut self.memory,
-                );
-                self.conditions.set(
-                    ConditionRegister::Carry,
-                    self.registers.get_8(register, &self.memory) == 0,
-                );
-                self.conditions.set(
-                    ConditionRegister::Sign,
-                    self.registers.get_8(register, &self.memory) < 0b10000000,
-                );
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    is_even(self.registers.get_8(register, &self.memory).count_ones()),
-                );
-                self.conditions.set(
-                    ConditionRegister::Zero,
-                    self.registers.get_8(register, &self.memory) == 0,
-                );
+                let value = self.registers.get_8(register, &self.memory);
+                
+                let result = value.wrapping_add(1);
+                let ac_flag = calc_ac_flag_add(value, 1, false);
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+                
+                self.registers.set_8(register, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
             Instruction::Dcr(register) => {
-                self.registers.set_8(
-                    register,
-                    self.registers.get_8(register, &self.memory).wrapping_sub(1),
-                    &mut self.memory,
-                );
-                self.conditions.set(
-                    ConditionRegister::Carry,
-                    self.registers.get_8(register, &self.memory) == 0,
-                );
-                self.conditions.set(
-                    ConditionRegister::Sign,
-                    self.registers.get_8(register, &self.memory) < 0b10000000,
-                );
-                self.conditions.set(
-                    ConditionRegister::Parity,
-                    is_even(self.registers.get_8(register, &self.memory).count_ones()),
-                );
-                self.conditions.set(
-                    ConditionRegister::Zero,
-                    self.registers.get_8(register, &self.memory) == 0,
-                );
+                let value = self.registers.get_8(register, &self.memory);
+                
+                let result = value.wrapping_sub(1);
+                let ac_flag = calc_ac_flag_add(value, 0b1111_1111, false);
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+                
+                self.registers.set_8(register, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
             Instruction::Inx(register_pair) => {
-                self.registers.set_16(
-                    register_pair,
-                    ((self.registers.get_16(register_pair).high.wrapping_add(1) as u16) << 8
-                        | self.registers.get_16(register_pair).low.wrapping_add(1) as u16)
-                        .into(),
-                );
-
+                let value: u16 = self.registers.get_16(register_pair).into();
+                
+                let result = value.wrapping_add(1);
+                
+                self.registers.set_16(register_pair, result.into());
                 ExecutionResult::Running
             }
             Instruction::Dcx(register_pair) => {
-                self.registers.set_16(
-                    register_pair,
-                    ((self.registers.get_16(register_pair).high.wrapping_sub(1) as u16) << 8
-                        | self.registers.get_16(register_pair).low.wrapping_sub(1) as u16)
-                        .into(),
-                );
+                let value: u16 = self.registers.get_16(register_pair).into();
+                
+                let result = value.wrapping_sub(1);
+                
+                self.registers.set_16(register_pair, result.into());
                 ExecutionResult::Running
             }
             Instruction::Dad(register_pair) => {
                 let hl = self.registers.get_16(RegisterPair::Hl).value();
-                let value = self.registers.get_16(register_pair).value();
-                let result = hl.wrapping_add(value);
-                if result < hl.max(value) {
-                    self.conditions.set(ConditionRegister::Carry, true);
-                } else {
-                    self.conditions.set(ConditionRegister::Carry, false);
-                }
-                self.registers.set_16(RegisterPair::Hl, result.into());
+                let term = self.registers.get_16(register_pair).value();
+                
+                let result = (hl as u32) + (term as u32);
+                let cy_flag = (result >> 16) & 0b1 == 1;
+
+                self.registers.set_16(RegisterPair::Hl, (result as u16).into());
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
                 ExecutionResult::Running
             }
-            Instruction::Daa => unimplemented!(),
+            Instruction::Daa => {
+                // (Decimal Adjust Accumulator)
+                //
+                // The eight-bit number in the accumulator is adjusted
+                // to form two four-bit Binary-Coded-Decimal digits by
+                // the following process:
+                //
+                // 1. If the value of the least significant 4 bits of the
+                //    accumulator is greater than 9 or if the AC flag
+                //    is set, 6 is added to the accumulator.
+                //
+                // 2. If the value of the most significant 4 bits of the
+                //    accumulator is now greater than 9, or if the CY
+                //    flag is set, 6 is added to the most significant 4
+                //    bits of the accumulator
+                //
+                let mut ac_flag = self.conditions.get(ConditionRegister::AuxiliaryCarry);
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let mut wrapped = false;
+                let mut a = self.registers.get_8(Register::A, &self.memory);
+                // 1.
+                let lsb = a & 0b0000_1111;
+                if lsb > 9 || ac_flag {
+                    ac_flag = lsb > 9;
+                    if a > 0b1111_1111 - 6 {
+                        wrapped = true;
+                    }
+                    a = a.wrapping_add(6);
+                } else {
+                    ac_flag = false;
+                }
+                // 2.
+                let msb = (a >> 4) & 0b0000_1111;
+                if msb > 9 || cy_flag {
+                    if a > 0b1111_1111 - (6 << 4) {
+                        wrapped = true;
+                    }
+                    a = a.wrapping_add(6 << 4);
+                }
+
+                let z_flag = a == 0;
+                let s_flag = a & 0b1000_0000 == 1;
+                let p_flag = is_even(a.count_ones());
+                let cy_flag = wrapped;
+
+                self.registers.set_8(Register::A, a, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
+                ExecutionResult::Running
+            },
             Instruction::Ana(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
                 let value = self.registers.get_8(register, &self.memory);
+                
                 let result = a & value;
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Sign, result < 128);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
-            Instruction::Ani(data) => {
+            Instruction::Ani(value) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let result = a & data;
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Sign, result < 128);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                
+                let result = a & value;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
             Instruction::Xra(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
                 let value = self.registers.get_8(register, &self.memory);
+                
                 let result = a ^ value;
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Sign, result < 128);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
-            Instruction::Xri(data) => {
+            Instruction::Xri(value) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let result = a ^ data;
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Sign, result < 128);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                
+                let result = a ^ value;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
             Instruction::Ora(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
                 let value = self.registers.get_8(register, &self.memory);
+                
                 let result = a | value;
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Sign, result < 128);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
-            Instruction::Ori(data) => {
+            Instruction::Ori(value) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let result = a | data;
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.registers
-                    .set_8(Register::A, result, &mut self.memory);
-                self.conditions.set(ConditionRegister::Sign, result < 128);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                
+                let result = a | value;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
                 self.conditions.set(ConditionRegister::Carry, false);
                 ExecutionResult::Running
             }
             Instruction::Cmp(register) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let value = self.register_8(register);
-                let (result, overflow) = a.overflowing_sub(value);
-                self.conditions.set(ConditionRegister::Carry, !overflow);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+                let term = self.registers.get_8(register, &self.memory);
+
+                let term_complement = (!term).wrapping_add(1);
+                
+                let result = (a as u16) + (term_complement as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term_complement, false);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                // subtraction without actually storing the value
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
-            Instruction::Cpi(data) => {
+            Instruction::Cpi(term) => {
                 let a = self.registers.get_8(Register::A, &self.memory);
-                let (result, overflow) = a.overflowing_sub(data);
-                self.conditions.set(ConditionRegister::Carry, !overflow);
-                self.conditions.set(ConditionRegister::Zero, result == 0);
-                self.conditions
-                    .set(ConditionRegister::Sign, result < 0b10000000);
-                self.conditions
-                    .set(ConditionRegister::Parity, is_even(result.count_ones()));
+
+                let term_complement = (!term).wrapping_add(1);
+                
+                let result = (a as u16) + (term_complement as u16);
+
+                let ac_flag = calc_ac_flag_add(a, term_complement, false);
+                let cy_flag = (result >> 8) & 0b1 == 1;
+                let result = result as u8;
+                let z_flag = result == 0;
+                let s_flag = result & 0b1000_0000 == 1;
+                let p_flag = is_even(result.count_ones());
+
+                // subtraction without actually storing the value
+                self.conditions.set(ConditionRegister::Zero, z_flag);
+                self.conditions.set(ConditionRegister::Sign, s_flag);
+                self.conditions.set(ConditionRegister::Parity, p_flag);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                self.conditions.set(ConditionRegister::AuxiliaryCarry, ac_flag);
                 ExecutionResult::Running
             }
-            Instruction::Rlc => unimplemented!(),
-            Instruction::Rrc => unimplemented!(),
-            Instruction::Ral => unimplemented!(),
-            Instruction::Rar => unimplemented!(),
-            Instruction::Cma => unimplemented!(),
-            Instruction::Cmc => unimplemented!(),
-            Instruction::Stc => unimplemented!(),
+            Instruction::Rlc => {
+                let cy_flag = (self.registers.a >> 7) & 0b1 == 1;
+                self.registers.a = self.registers.a.wrapping_shl(1);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                ExecutionResult::Running
+            },
+            Instruction::Rrc => {
+                let cy_flag = self.registers.a & 0b1 == 1;
+                self.registers.a = self.registers.a.wrapping_shr(1);
+                self.conditions.set(ConditionRegister::Carry, cy_flag);
+                ExecutionResult::Running
+            },
+            Instruction::Ral => {
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let new_cy_flag = (self.registers.a >> 7) & 0b1 == 1;
+                self.registers.a = self.registers.a.wrapping_shl(1);
+                self.registers.a &= cy_flag as u8;
+                self.conditions.set(ConditionRegister::Carry, new_cy_flag);
+                ExecutionResult::Running
+            },
+            Instruction::Rar => {
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let new_cy_flag = self.registers.a & 0b1 == 1;
+                self.registers.a = self.registers.a.wrapping_shr(1);
+                self.registers.a &= (cy_flag as u8) << 7;
+                self.conditions.set(ConditionRegister::Carry, new_cy_flag);
+                ExecutionResult::Running
+            },
+            Instruction::Cma => {
+                let a = self.registers.get_8(Register::A, &self.memory);
+                let result = !a;
+                self.registers.set_8(Register::A, result, &mut self.memory);
+                ExecutionResult::Running
+            },
+            Instruction::Cmc => {
+                let cy_flag = self.conditions.get(ConditionRegister::Carry);
+                let result = !cy_flag;
+                self.conditions.set(ConditionRegister::Carry, result);
+                ExecutionResult::Running
+            },
+            Instruction::Stc => {
+                self.conditions.set(ConditionRegister::Carry, true);
+                ExecutionResult::Running
+            },
             Instruction::Jmp(address) => {
                 self.pc = address.into();
                 ExecutionResult::ControlTransfer
@@ -731,9 +951,13 @@ impl Machine {
                     Condition::ParityEven => self.conditions.get(ConditionRegister::Parity),
                     Condition::ParityOdd => !self.conditions.get(ConditionRegister::Parity),
                 };
-                if should_call && self.stack_push(self.pc).is_some() {
-                    self.pc = address.into();
-                    ExecutionResult::ControlTransfer
+                if should_call {
+                    if should_call && self.stack_push(self.pc).is_some() {
+                        self.pc = address.into();
+                        ExecutionResult::ControlTransfer
+                    } else {
+                        ExecutionResult::StackOverflow
+                    }
                 } else {
                     ExecutionResult::Running
                 }
@@ -769,41 +993,59 @@ impl Machine {
                     ExecutionResult::Running
                 }
             }
-            Instruction::Rst(_restart_number) => unimplemented!(),
+            Instruction::Rst(restart_number) => {
+                if self.stack_push(self.pc).is_some() {
+                    self.pc = (u16::from(restart_number) << 3).into();
+                    ExecutionResult::ControlTransfer
+                } else {
+                    ExecutionResult::StackOverflow
+                }
+            },
             Instruction::Pchl => {
                 self.pc = self.register_16(RegisterPair::Hl);
                 ExecutionResult::ControlTransfer
             }
-            Instruction::Push(register_pair_or_status) => {
-                let register = match register_pair_or_status {
-                    RegisterPairOrStatus::Bc => RegisterPair::Bc,
-                    RegisterPairOrStatus::De => RegisterPair::De,
-                    RegisterPairOrStatus::Hl => RegisterPair::Hl,
-                    RegisterPairOrStatus::StatusWord => unimplemented!(),
+            Instruction::Push(register) => {
+                let data = if let Some(register) = register.to_register_pair() {
+                    self.register_16(register)
+                } else {
+                    self.get_status_word()
                 };
-                match self.stack_push(self.register_16(register)) {
+                match self.stack_push(data) {
                     Some(()) => ExecutionResult::Running,
                     None => ExecutionResult::StackOverflow,
                 }
             }
-            Instruction::Pop(register_pair_or_status) => {
-                let register = match register_pair_or_status {
-                    RegisterPairOrStatus::Bc => RegisterPair::Bc,
-                    RegisterPairOrStatus::De => RegisterPair::De,
-                    RegisterPairOrStatus::Hl => RegisterPair::Hl,
-                    RegisterPairOrStatus::StatusWord => unimplemented!(),
-                };
+            Instruction::Pop(register) => {
                 match self.stack_pop() {
                     Some(value) => {
-                        self.registers.set_16(register, value);
+                        if let Some(register) = register.to_register_pair() {
+                            self.registers.set_16(register, value);
+                        } else {
+                            self.set_status_word(value)
+                        }
                         ExecutionResult::Running
                     }
                     None => ExecutionResult::StackOverflow,
                 }
             }
-            Instruction::Xthl => unimplemented!(),
-            Instruction::Sphl => unimplemented!(),
-            // We don't support io
+            Instruction::Xthl => {
+                let hl = self.registers.get_16(RegisterPair::Hl);
+                let sp = self.registers.get_16(RegisterPair::Sp);
+                let Some(stack_top) = self.memory.read_16(sp.into()) else {
+                    return ExecutionResult::StackOverflow;
+                };
+                self.registers.set_16(RegisterPair::Hl, stack_top);
+                if matches!(self.memory.write_16(sp.into(), hl), None) {
+                    return ExecutionResult::StackOverflow;
+                }
+                ExecutionResult::Running
+            },
+            Instruction::Sphl => {
+                let hl = self.registers.get_16(RegisterPair::Hl);
+                self.registers.set_16(RegisterPair::Sp, hl);
+                ExecutionResult::Running
+            },
             Instruction::In(port) => {
                 let byte = match port {
                     0 => {
@@ -843,14 +1085,21 @@ impl Machine {
                     _ => ExecutionResult::Running,
                 }
             },
-            // We don't support interrupts
-            Instruction::Ei => unimplemented!(),
-            Instruction::Di => unimplemented!(),
+            // We don't support interrupts, equate EI and DI to NOP
+            Instruction::Ei => ExecutionResult::Running,
+            Instruction::Di => ExecutionResult::Running,
             Instruction::Hlt => ExecutionResult::Halt,
             Instruction::Nop => ExecutionResult::Running,
         }
     }
 }
+
+fn calc_ac_flag_add(a: u8, b: u8, cy_flag: bool) -> bool {
+    let a = a & 0b0000_1111;
+    let b = b & 0b0000_1111;
+    (a + b + (cy_flag as u8)) & 0b0001_0000 == 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -937,7 +1186,7 @@ mod tests {
 
         assert_eq!(result, ExecutionResult::Running);
 
-        assert_eq!(0x0001, machine.register_16(RegisterPair::Bc).value());
+        assert_eq!(0xFF01, machine.register_16(RegisterPair::Bc).value());
 
         println!("inx: Time elapsed: {:?}", elapsed);
     }
