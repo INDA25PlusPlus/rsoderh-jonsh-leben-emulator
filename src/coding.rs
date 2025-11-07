@@ -95,7 +95,7 @@ pub fn encode(buffer: &mut impl Write, instruction: Instruction) -> std::io::Res
         Instruction::Ei => encode::encode_ei(buffer),
         Instruction::Di => encode::encode_di(buffer),
         Instruction::Hlt => encode::encode_hlt(buffer),
-        Instruction::Nop => encode::encode_noop(buffer),
+        Instruction::Nop => encode::encode_nop(buffer),
     }
 }
 

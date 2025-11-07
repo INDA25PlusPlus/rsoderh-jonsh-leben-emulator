@@ -113,13 +113,7 @@ pub fn encode_stax<'a>(stream: &mut impl io::Write, rp: RegisterPairIndirect) ->
 }
 
 pub fn encode_xchg<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
-}
-
-
-
-pub fn encode_noop<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    write_opcode(stream, 0b0000_0000)
+    write_opcode(stream, 0b1110_1011)
 }
 
 
@@ -129,7 +123,8 @@ pub fn encode_add<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_adi<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1100_0110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_adc<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
@@ -137,7 +132,8 @@ pub fn encode_adc<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_aci<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1100_1110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_sub<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
@@ -145,7 +141,8 @@ pub fn encode_sub<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_sui<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1101_0110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_sbb<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
@@ -153,7 +150,8 @@ pub fn encode_sbb<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_sbi<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1101_1110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_inr<'a>(stream: &mut impl io::Write, ddd: Register) -> io::Result<()> {
@@ -187,7 +185,8 @@ pub fn encode_ana<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_ani<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1110_0110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_xra<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
@@ -195,7 +194,8 @@ pub fn encode_xra<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_xri<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1110_1110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_ora<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
@@ -203,7 +203,8 @@ pub fn encode_ora<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_ori<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1111_0110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_cmp<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
@@ -211,7 +212,8 @@ pub fn encode_cmp<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<
 }
 
 pub fn encode_cpi<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1111_1110)?;
+    write_data_8(stream, data)
 }
 
 pub fn encode_rlc<'a>(stream: &mut impl io::Write) -> io::Result<()> {
@@ -275,7 +277,7 @@ pub fn encode_rst<'a>(stream: &mut impl io::Write, n: RestartNumber) -> io::Resu
 }
 
 pub fn encode_pchl<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1110_1001)
 }
 
 
@@ -289,11 +291,11 @@ pub fn encode_pop<'a>(stream: &mut impl io::Write, rp: RegisterPairOrStatus) -> 
 }
 
 pub fn encode_xthl<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1110_0011)
 }
 
 pub fn encode_sphl<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1111_1001)
 }
 
 pub fn encode_in<'a>(stream: &mut impl io::Write, port: Port) -> io::Result<()> {
@@ -307,11 +309,11 @@ pub fn encode_out<'a>(stream: &mut impl io::Write, port: Port) -> io::Result<()>
 }
 
 pub fn encode_ei<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1111_1011)
 }
 
 pub fn encode_di<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b1111_0011)
 }
 
 pub fn encode_hlt<'a>(stream: &mut impl io::Write) -> io::Result<()> {
@@ -319,5 +321,5 @@ pub fn encode_hlt<'a>(stream: &mut impl io::Write) -> io::Result<()> {
 }
 
 pub fn encode_nop<'a>(stream: &mut impl io::Write) -> io::Result<()> {
-    unimplemented!()
+    write_opcode(stream, 0b0000_0000)
 }
