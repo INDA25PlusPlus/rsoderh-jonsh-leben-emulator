@@ -313,10 +313,11 @@ impl TryFrom<u8> for RestartNumber {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum InstructionOrData {
     Instruction(Instruction),
-    Data(Data8),
+    Byte(Data8),
+    Slice(Box<[u8]>),
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]

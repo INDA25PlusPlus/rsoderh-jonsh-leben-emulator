@@ -1,8 +1,8 @@
 use parsable::{Parsable, format_error_stack};
 
 use crate::{
-    assembler::{labels::{Label, LabelLookup}, parse::{CodeLineContent, CodeSegment, LabelSegment, SourceFile}},
-    instruction::{Address, InstructionOrData},
+    assembler::{labels::{Label, LabelLookup}, parse::{LabelSegment, SourceFile, StatementLineContent, StatementSegment, instruction::{DataStatement, Statement}}},
+    instruction::{Address, Data16, InstructionOrData},
 };
 
 mod labels;
@@ -48,25 +48,25 @@ pub fn parse_assembly(
         current_address,
     )?;
 
-    fn get_label(content: &CodeLineContent) -> Option<&LabelSegment> {
+    fn get_label(content: &StatementLineContent) -> Option<&LabelSegment> {
         match &content {
-            CodeLineContent::Labeled(label_segment, ..) => Some(label_segment),
+            StatementLineContent::Labeled(label_segment, ..) => Some(label_segment),
             _ => None,
         }
     }
 
-    fn get_code(content: &CodeLineContent) -> Option<&CodeSegment> {
+    fn get_code(content: &StatementLineContent) -> Option<&StatementSegment> {
         match &content {
-            CodeLineContent::Labeled(_, code_segment, ..) => code_segment.as_ref(),
-            CodeLineContent::NoLabel(code_segment, ..) => Some(code_segment),
+            StatementLineContent::Labeled(_, code_segment, ..) => code_segment.as_ref(),
+            StatementLineContent::NoLabel(code_segment, ..) => Some(code_segment),
             _ => None,
         }
     }
 
-    fn get_code_owned(content: CodeLineContent) -> Option<CodeSegment> {
+    fn get_code_owned(content: StatementLineContent) -> Option<StatementSegment> {
         match content {
-            CodeLineContent::Labeled(_, code_segment, ..) => code_segment,
-            CodeLineContent::NoLabel(code_segment, ..) => Some(code_segment),
+            StatementLineContent::Labeled(_, code_segment, ..) => code_segment,
+            StatementLineContent::NoLabel(code_segment, ..) => Some(code_segment),
             _ => None,
         }
     }
@@ -74,18 +74,52 @@ pub fn parse_assembly(
     for code_line in &source_file.lines.nodes {
         add_label_segment_opt(get_label(&code_line.content), current_address)?;
         if let Some(code) = get_code(&code_line.content) {
-            let instruction = &code.instruction;
-            current_address = current_address.checked_add(instruction.node.instruction_length())
-                .ok_or(format!("{}: Memory size overflowed", instruction.index))?;
+            let statement = &code.statement;
+            match &statement.node {
+                Statement::DataStatement(data_statement) => {
+                    let length = data_statement.byte_length().ok_or(
+                        format!("{}: Invalid number", statement.index))?;
+                    current_address = current_address.checked_add(length)
+                        .ok_or(format!("{}: Memory size overflowed", statement.index))?;
+                },
+                Statement::Instruction(instruction) => {
+                    current_address = current_address.checked_add(instruction.instruction_length())
+                        .ok_or(format!("{}: Memory size overflowed", statement.index))?;
+                },
+            }
         }
     }
 
     let mut instructions = Vec::new();
     for code_line in source_file.lines.nodes {
         if let Some(code) = get_code_owned(code_line.content) {
-            let instruction = code.instruction.node.into_inner(&labels)
-                .ok_or(format!("{}: Unknown label", code.instruction.index))?;
-            instructions.push(InstructionOrData::Instruction(instruction));
+            let statement = code.statement;
+            match statement.node {
+                Statement::DataStatement(data_statement) => match data_statement {
+                    DataStatement::DefineByte(_, _, literal_string) => {
+                        instructions.push(InstructionOrData::Slice(
+                            literal_string.contents.span.clone().into_boxed_slice()));
+                    },
+                    DataStatement::DefineWord(_, _, label) => {
+                        let data = labels.get(label)
+                            .ok_or(format!("{}: Unknown label", statement.index))?;
+                        let data = Data16::from(data);
+                        instructions.push(InstructionOrData::Byte(data.low));
+                        instructions.push(InstructionOrData::Byte(data.high));
+                    },
+                    DataStatement::DefineStorage(_, _, literal_number) => {
+                        let length: u16 = literal_number.try_into()
+                            .map_err(|_| format!("{}: Invalid number", statement.index))?;
+                        instructions.push(InstructionOrData::Slice(
+                            vec![0; length as usize].into_boxed_slice()));
+                    },
+                },
+                Statement::Instruction(instruction) => {
+                    let instruction = instruction.into_inner(&labels)
+                        .ok_or(format!("{}: Unknown label", statement.index))?;
+                    instructions.push(InstructionOrData::Instruction(instruction));
+                },
+            }
         }
     }
     Ok((instructions, origin_address))

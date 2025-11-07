@@ -1,10 +1,39 @@
+use std::ops::Deref;
+
 use parsable::Parsable;
 
 use crate::assembler::labels::{Label, LabelLookup};
-use crate::assembler::parse::number::LiteralNumber;
+use crate::assembler::parse::literals::{LiteralNumber, LiteralString};
 use crate::assembler::parse::Ws;
 use crate::assembler::parse::token::*;
 use crate::instruction::{Condition, Instruction, Register, RegisterPair, RegisterPairIndirect, RegisterPairOrStatus};
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub enum Statement {
+    DataStatement(DataStatement),
+    Instruction(ParsedInstruction),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub enum DataStatement {
+    DefineByte(DefineByte, Ws, LiteralString),
+    DefineWord(DefineWord, Ws, Label),
+    DefineStorage(DefineStorage, Ws, LiteralNumber),
+}
+
+impl DataStatement {
+    pub fn byte_length(&self) -> Option<u16> {
+        match self {
+            DataStatement::DefineByte(_, _, literal_string) => {
+                Some(literal_string.contents.span.len() as u16)
+            }
+            DataStatement::DefineWord(..) => Some(2),
+            DataStatement::DefineStorage(_, _, literal_number) => {
+                literal_number.clone().try_into().ok()
+            }
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub struct ParsedInstruction {

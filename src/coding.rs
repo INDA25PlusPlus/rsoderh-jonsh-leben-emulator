@@ -15,9 +15,12 @@ pub fn encode_program(buffer: &mut impl Write, items: &[InstructionOrData]) -> i
             InstructionOrData::Instruction(instruction) => {
                 encode(buffer, *instruction)?;
             }
-            InstructionOrData::Data(data) => {
+            InstructionOrData::Byte(data) => {
                 buffer.write(&[*data])?;
             }
+            InstructionOrData::Slice(slice) => {
+                buffer.write_all(&slice)?;
+            },
         }
     }
     

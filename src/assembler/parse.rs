@@ -1,18 +1,18 @@
 pub mod instruction;
-mod number;
+mod literals;
 mod token;
 
 use std::fmt::Debug;
 use parsable::{CharLiteral, CharRange, EndOfStream, Ignore, Parsable, WithIndex, ZeroPlus, ok_or_throw};
 
-use crate::assembler::{labels::Label, parse::{instruction::ParsedInstruction, number::LiteralNumber, token::{Colon, EndOfAssembly, Origin, Semicolon}}};
+use crate::assembler::{labels::Label, parse::{instruction::Statement, literals::LiteralNumber, token::{Colon, EndOfAssembly, Origin, Semicolon}}};
 
 #[derive(Clone, PartialEq, Eq, Parsable)]
 pub struct SourceFile {
     _0: WsNl,
     _1: ZeroPlus<CommentOnlyLine>,
     pub origin_line: Option<OriginLine>,
-    pub lines: ZeroPlus<CodeLine>,
+    pub lines: ZeroPlus<StatementLine>,
     end: EndOfAssemblyLine,
     _2: ZeroPlus<CommentOnlyLine>,
 }
@@ -51,15 +51,15 @@ impl<'a> Parsable<'a> for OriginLine {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
-pub struct CodeLine {
-    pub content: CodeLineContent,
+pub struct StatementLine {
+    pub content: StatementLineContent,
     _0: WsNl,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
-pub enum CodeLineContent {
-    Labeled(LabelSegment, Option<CodeSegment>, Option<CommentSegment>),
-    NoLabel(CodeSegment, Option<CommentSegment>),
+pub enum StatementLineContent {
+    Labeled(LabelSegment, Option<StatementSegment>, Option<CommentSegment>),
+    NoLabel(StatementSegment, Option<CommentSegment>),
     OnlyComment(CommentSegment),
 }
 
@@ -95,14 +95,14 @@ impl Debug for LabelSegment {
 }
 
 #[derive(Clone, PartialEq, Eq, Parsable)]
-pub struct CodeSegment {
-    pub instruction: WithIndex<ParsedInstruction>,
+pub struct StatementSegment {
+    pub statement: WithIndex<Statement>,
     _0: Ws,
 }
 
-impl Debug for CodeSegment {
+impl Debug for StatementSegment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CodeSegment").field("instruction", &self.instruction.node).field("_0", &self._0).finish()
+        f.debug_struct("StatementSegment").field("statement", &self.statement.node).field("_0", &self._0).finish()
     }
 }
 

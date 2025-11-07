@@ -1,6 +1,13 @@
-use parsable::{CharLiteral, CharRange, OnePlus, Parsable, Span};
+use parsable::{CharLiteral, CharRange, OnePlus, Parsable, Span, ZeroPlus};
 
 use crate::instruction::{Data16, RestartNumber};
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub struct LiteralString {
+    _0: CharLiteral<b'\''>,
+    pub contents: Span<ZeroPlus<StringChar>>,
+    _1: CharLiteral<b'\''>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub struct LiteralNumber {
@@ -79,6 +86,13 @@ impl TryFrom<LiteralNumber> for RestartNumber {
             _ => Err(()),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub enum StringChar {
+    Tab(CharLiteral<b'\t'>),
+    FirstPart(CharRange<b' ', b'&'>),
+    SecondPart(CharRange<b'(', b'~'>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
