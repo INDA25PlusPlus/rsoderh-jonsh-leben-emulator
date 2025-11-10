@@ -1,0 +1,13 @@
+;
+; Print random bytes to stdout
+;
+
+@MAI:
+    ?MAI0:
+        IN 1
+        OUT 0
+        JMP ?MAI0
+
+HLT ; @MAI
+
+END

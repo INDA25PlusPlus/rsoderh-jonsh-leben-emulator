@@ -11,3 +11,4 @@ tui = "0.19.0"
 parsable = { git="https://github.com/LeonardBengtsson/parsing-library" }
 serde = "1.0.228"
 clap = { version = "4.5.51", features = ["derive"] }
+rand = "0.9.2"

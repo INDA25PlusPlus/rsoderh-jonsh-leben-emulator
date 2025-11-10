@@ -45,6 +45,8 @@ The input/output device number specified in the instruction is mapped as follows
 
 `IN 0`: Reads one byte from stdin, and stores it in the accumulator register.
 
+`IN 1`: Set the accumulator register to a random value in the range 0-255.
+
 `IN x` for all other `x`: Sets the accumulator register to `0`.
 
 `OUT 0`: Writes the byte stored in the accumulator register to stdout.

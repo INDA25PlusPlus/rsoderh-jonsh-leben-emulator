@@ -1,5 +1,7 @@
 use std::{fmt::Display, io::{self, Read}};
 
+use rand::Rng;
+
 use crate::{
     coding::{self, reader::Reader},
     instruction::{
@@ -1071,6 +1073,9 @@ impl Machine {
                             Some(byte) => byte,
                             None => return ExecutionResult::Halt,
                         }
+                    }
+                    1 => {
+                        rand::rng().random()
                     }
                     _ => 0,
                 };
