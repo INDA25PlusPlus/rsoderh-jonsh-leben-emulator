@@ -80,7 +80,7 @@ pub fn encode_mvi<'a>(stream: &mut impl io::Write, ddd: Register, data: Data8) -
 }
 
 pub fn encode_lxi<'a>(stream: &mut impl io::Write, rp: RegisterPair, data: Data16) -> io::Result<()> {
-    write_opcode_rp(stream, 0b0000_0000, rp)?;
+    write_opcode_rp(stream, 0b0000_0001, rp)?;
     write_data_16(stream, data)
 }
 
@@ -128,7 +128,7 @@ pub fn encode_adi<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()
 }
 
 pub fn encode_adc<'a>(stream: &mut impl io::Write, sss: Register) -> io::Result<()> {
-    write_opcode_sss(stream, 0b1001_0000, sss)
+    write_opcode_sss(stream, 0b1000_1000, sss)
 }
 
 pub fn encode_aci<'a>(stream: &mut impl io::Write, data: Data8) -> io::Result<()> {

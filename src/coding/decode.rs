@@ -39,6 +39,11 @@ pub fn parse_mov<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
         .try_into()
         .expect("Registers cover all 3 bit numbers");
 
+    if matches!(ddd, Register::M) && matches!(sss, Register::M) {
+        // coincides with coding for HLT instruction, so this is actually a HLT instruction
+        return None;
+    }
+
     stream.skip_n(LEN);
 
     return Some(Instruction::Mov(ddd, sss));
@@ -222,7 +227,7 @@ pub fn parse_adc<'a>(stream: &mut Reader<'a>) -> Option<Instruction> {
     static LEN: usize = 1;
     let bytes = stream.peek_n(LEN)?;
     let opcode = bytes[0];
-    if !is_eq_masked(opcode, 0b1001_0000, 0b1111_1000) {
+    if !is_eq_masked(opcode, 0b1000_1000, 0b1111_1000) {
         return None;
     };
 
