@@ -96,13 +96,14 @@ pub fn parse_assembly(
             let statement = code.statement;
             match statement.node {
                 Statement::DataStatement(data_statement) => match data_statement {
-                    DataStatement::DefineByte(_, _, literal_string) => {
-                        instructions.push(InstructionOrData::Slice(
-                            literal_string.contents.span.clone().into_boxed_slice()));
+                    DataStatement::DefineByte(_, _, literal) => {
+                        instructions.push(InstructionOrData::Slice(literal.get()
+                            .ok_or(format!("{}: Invalid number", statement.index))?));
                     },
-                    DataStatement::DefineWord(_, _, label) => {
-                        let data = labels.get(label)
+                    DataStatement::DefineWord(_, _, data) => {
+                        let data = data.get(&labels)
                             .ok_or(format!("{}: Unknown label", statement.index))?;
+                            
                         let data = Data16::from(data);
                         instructions.push(InstructionOrData::Byte(data.low));
                         instructions.push(InstructionOrData::Byte(data.high));

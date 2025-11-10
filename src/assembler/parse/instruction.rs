@@ -6,7 +6,7 @@ use crate::assembler::labels::{Label, LabelLookup};
 use crate::assembler::parse::literals::{LiteralNumber, LiteralString};
 use crate::assembler::parse::Ws;
 use crate::assembler::parse::token::*;
-use crate::instruction::{Condition, Instruction, Register, RegisterPair, RegisterPairIndirect, RegisterPairOrStatus};
+use crate::instruction::{Address, Condition, Data16, Instruction, Register, RegisterPair, RegisterPairIndirect, RegisterPairOrStatus};
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub enum Statement {
@@ -15,21 +15,67 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub enum LiteralStringOrNumber {
+    String(LiteralString),
+    Number(LiteralNumber),
+}
+
+impl LiteralStringOrNumber {
+    pub fn get(self) -> Option<Box<[u8]>> {
+        match self {
+            LiteralStringOrNumber::String(literal_string) => {
+                Some(literal_string.contents.span.clone().into_boxed_slice())
+            },
+            LiteralStringOrNumber::Number(literal_number) => {
+                let value: u8 = literal_number.try_into().ok()?;
+                Some(Box::new([value]))
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
 pub enum DataStatement {
-    DefineByte(DefineByte, Ws, LiteralString),
-    DefineWord(DefineWord, Ws, Label),
+    DefineByte(DefineByte, Ws, LiteralStringOrNumber),
+    DefineWord(DefineWord, Ws, LabelOrLiteralNumber),
     DefineStorage(DefineStorage, Ws, LiteralNumber),
 }
 
 impl DataStatement {
     pub fn byte_length(&self) -> Option<u16> {
         match self {
-            DataStatement::DefineByte(_, _, literal_string) => {
-                Some(literal_string.contents.span.len() as u16)
+            DataStatement::DefineByte(_, _, literal) => {
+                match literal {
+                    LiteralStringOrNumber::String(literal_string) => {
+                        Some(literal_string.contents.span.len() as u16)
+                    },
+                    LiteralStringOrNumber::Number(_) => {
+                        Some(1)
+                    },
+                }
             }
             DataStatement::DefineWord(..) => Some(2),
             DataStatement::DefineStorage(_, _, literal_number) => {
                 literal_number.clone().try_into().ok()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Parsable)]
+pub enum LabelOrLiteralNumber {
+    Label(Label),
+    LiteralNumber(LiteralNumber),
+}
+
+impl LabelOrLiteralNumber {
+    pub fn get(self, label_lookup: &LabelLookup) -> Option<Address> {
+        match self {
+            LabelOrLiteralNumber::Label(label) => {
+                label_lookup.get(label)
+            }
+            LabelOrLiteralNumber::LiteralNumber(literal_number) => {
+                literal_number.try_into().ok()
             }
         }
     }
@@ -47,11 +93,11 @@ impl ParsedInstruction {
         match self.inner {
             PI::Mov(_, _, r1, _, _, _, r2) => Some(I::Mov(r1, r2)),
             PI::Mvi(_, _, r1, _, _, _, data) => Some(I::Mvi(r1, data.try_into().ok()?)),
-            PI::Lxi(_, _, rp, _, _, _, data) => Some(I::Lxi(rp, data.try_into().ok()?)),
+            PI::Lxi(_, _, rp, _, _, _, data) => Some(I::Lxi(rp, data.get(label_lookup)?.into())),
             PI::Lda(_, _, label) => Some(I::Lda(label_lookup.get(label)?)),
             PI::Sta(_, _, label) => Some(I::Sta(label_lookup.get(label)?)),
-            PI::Lhld(_, _, label) => Some(I::Lhld(label_lookup.get(label)?)),
-            PI::Shld(_, _, label) => Some(I::Shld(label_lookup.get(label)?)),
+            PI::Lhld(_, _, data) => Some(I::Lhld(data.get(label_lookup)?)),
+            PI::Shld(_, _, data) => Some(I::Shld(data.get(label_lookup)?)),
             PI::Ldax(_, _, rp) => Some(I::Ldax(rp)),
             PI::Stax(_, _, rp) => Some(I::Stax(rp)),
             PI::Xchg(_) => Some(I::Xchg),
@@ -87,24 +133,24 @@ impl ParsedInstruction {
             PI::Cmc(_) => Some(I::Cmc),
             PI::Stc(_) => Some(I::Stc),
 
-            PI::Jmp(_, _, label) => Some(I::Jmp(label_lookup.get(label)?)),
-            PI::Jc(_, _, label) => Some(I::Jcc(Condition::Carry, label_lookup.get(label)?)),
-            PI::Jnc(_, _, label) => Some(I::Jcc(Condition::NoCarry, label_lookup.get(label)?)),
-            PI::Jz(_, _, label) => Some(I::Jcc(Condition::Zero, label_lookup.get(label)?)),
-            PI::Jnz(_, _, label) => Some(I::Jcc(Condition::NoZero, label_lookup.get(label)?)),
-            PI::Jp(_, _, label) => Some(I::Jcc(Condition::Positive, label_lookup.get(label)?)),
-            PI::Jm(_, _, label) => Some(I::Jcc(Condition::Minus, label_lookup.get(label)?)),
-            PI::Jpe(_, _, label) => Some(I::Jcc(Condition::ParityEven, label_lookup.get(label)?)),
-            PI::Jpo(_, _, label) => Some(I::Jcc(Condition::ParityOdd, label_lookup.get(label)?)),
-            PI::Call(_, _, label) => Some(I::Call(label_lookup.get(label)?)),
-            PI::Cc(_, _, label) => Some(I::Ccc(Condition::Carry, label_lookup.get(label)?)),
-            PI::Cnc(_, _, label) => Some(I::Ccc(Condition::NoCarry, label_lookup.get(label)?)),
-            PI::Cz(_, _, label) => Some(I::Ccc(Condition::Zero, label_lookup.get(label)?)),
-            PI::Cnz(_, _, label) => Some(I::Ccc(Condition::NoZero, label_lookup.get(label)?)),
-            PI::Cp(_, _, label) => Some(I::Ccc(Condition::Positive, label_lookup.get(label)?)),
-            PI::Cm(_, _, label) => Some(I::Ccc(Condition::Minus, label_lookup.get(label)?)),
-            PI::Cpe(_, _, label) => Some(I::Ccc(Condition::ParityEven, label_lookup.get(label)?)),
-            PI::Cpo(_, _, label) => Some(I::Ccc(Condition::ParityOdd, label_lookup.get(label)?)),
+            PI::Jmp(_, _, address) => Some(I::Jmp(address.get(label_lookup)?)),
+            PI::Jc(_, _, address) => Some(I::Jcc(Condition::Carry, address.get(label_lookup)?)),
+            PI::Jnc(_, _, address) => Some(I::Jcc(Condition::NoCarry, address.get(label_lookup)?)),
+            PI::Jz(_, _, address) => Some(I::Jcc(Condition::Zero, address.get(label_lookup)?)),
+            PI::Jnz(_, _, address) => Some(I::Jcc(Condition::NoZero, address.get(label_lookup)?)),
+            PI::Jp(_, _, address) => Some(I::Jcc(Condition::Positive, address.get(label_lookup)?)),
+            PI::Jm(_, _, address) => Some(I::Jcc(Condition::Minus, address.get(label_lookup)?)),
+            PI::Jpe(_, _, address) => Some(I::Jcc(Condition::ParityEven, address.get(label_lookup)?)),
+            PI::Jpo(_, _, address) => Some(I::Jcc(Condition::ParityOdd, address.get(label_lookup)?)),
+            PI::Call(_, _, address) => Some(I::Call(address.get(label_lookup)?)),
+            PI::Cc(_, _, address) => Some(I::Ccc(Condition::Carry, address.get(label_lookup)?)),
+            PI::Cnc(_, _, address) => Some(I::Ccc(Condition::NoCarry, address.get(label_lookup)?)),
+            PI::Cz(_, _, address) => Some(I::Ccc(Condition::Zero, address.get(label_lookup)?)),
+            PI::Cnz(_, _, address) => Some(I::Ccc(Condition::NoZero, address.get(label_lookup)?)),
+            PI::Cp(_, _, address) => Some(I::Ccc(Condition::Positive, address.get(label_lookup)?)),
+            PI::Cm(_, _, address) => Some(I::Ccc(Condition::Minus, address.get(label_lookup)?)),
+            PI::Cpe(_, _, address) => Some(I::Ccc(Condition::ParityEven, address.get(label_lookup)?)),
+            PI::Cpo(_, _, address) => Some(I::Ccc(Condition::ParityOdd, address.get(label_lookup)?)),
             PI::Ret(_) => Some(I::Ret),
             PI::Rc(_) => Some(I::Rcc(Condition::Carry)),
             PI::Rnc(_) => Some(I::Rcc(Condition::NoCarry)),
@@ -218,11 +264,11 @@ impl ParsedInstruction {
 enum ParsedInstructionInner {
     Mov(Mov, Ws, Register, Ws, Comma, Ws, Register),
     Mvi(Mvi, Ws, Register, Ws, Comma, Ws, LiteralNumber),
-    Lxi(Lxi, Ws, RegisterPair, Ws, Comma, Ws, LiteralNumber),
+    Lxi(Lxi, Ws, RegisterPair, Ws, Comma, Ws, LabelOrLiteralNumber),
     Lda(Lda, Ws, Label),
     Sta(Sta, Ws, Label),
-    Lhld(Lhld, Ws, Label),
-    Shld(Shld, Ws, Label),
+    Lhld(Lhld, Ws, LabelOrLiteralNumber),
+    Shld(Shld, Ws, LabelOrLiteralNumber),
     Ldax(Ldax, Ws, RegisterPairIndirect),
     Stax(Stax, Ws, RegisterPairIndirect),
     Xchg(Xchg),
@@ -258,24 +304,24 @@ enum ParsedInstructionInner {
     Cmc(Cmc),
     Stc(Stc),
 
-    Jmp(Jmp, Ws, Label),
-    Jc(Jc, Ws, Label),
-    Jnc(Jnc, Ws, Label),
-    Jz(Jz, Ws, Label),
-    Jnz(Jnz, Ws, Label),
-    Jp(Jp, Ws, Label),
-    Jm(Jm, Ws, Label),
-    Jpe(Jpe, Ws, Label),
-    Jpo(Jpo, Ws, Label),
-    Call(Call, Ws, Label),
-    Cc(Cc, Ws, Label),
-    Cnc(Cnc, Ws, Label),
-    Cz(Cz, Ws, Label),
-    Cnz(Cnz, Ws, Label),
-    Cp(Cp, Ws, Label),
-    Cm(Cm, Ws, Label),
-    Cpe(Cpe, Ws, Label),
-    Cpo(Cpo, Ws, Label),
+    Jmp(Jmp, Ws, LabelOrLiteralNumber),
+    Jc(Jc, Ws, LabelOrLiteralNumber),
+    Jnc(Jnc, Ws, LabelOrLiteralNumber),
+    Jz(Jz, Ws, LabelOrLiteralNumber),
+    Jnz(Jnz, Ws, LabelOrLiteralNumber),
+    Jp(Jp, Ws, LabelOrLiteralNumber),
+    Jm(Jm, Ws, LabelOrLiteralNumber),
+    Jpe(Jpe, Ws, LabelOrLiteralNumber),
+    Jpo(Jpo, Ws, LabelOrLiteralNumber),
+    Call(Call, Ws, LabelOrLiteralNumber),
+    Cc(Cc, Ws, LabelOrLiteralNumber),
+    Cnc(Cnc, Ws, LabelOrLiteralNumber),
+    Cz(Cz, Ws, LabelOrLiteralNumber),
+    Cnz(Cnz, Ws, LabelOrLiteralNumber),
+    Cp(Cp, Ws, LabelOrLiteralNumber),
+    Cm(Cm, Ws, LabelOrLiteralNumber),
+    Cpe(Cpe, Ws, LabelOrLiteralNumber),
+    Cpo(Cpo, Ws, LabelOrLiteralNumber),
     Ret(Ret),
     Rc(Rc),
     Rnc(Rnc),
