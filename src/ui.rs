@@ -120,12 +120,17 @@ enum UiState {
 struct Ui {
     machine: Machine,
     input_receiver: mpsc::Receiver<KeyEvent>,
-    quit_sender: mpsc::Sender<()>,
+    quit_sender: mpsc::Sender<Option<String>>,
     state: UiState,
 }
 
 impl Ui {
-    fn new(machine: Machine, input_receiver: mpsc::Receiver<KeyEvent>, quit_sender: mpsc::Sender<()>) -> Self {
+    fn new(
+        machine: Machine,
+        input_receiver: mpsc::Receiver<KeyEvent>,
+        quit_sender: mpsc::Sender<Option<String>>) 
+        -> Self 
+    {
         Self {
             machine,
             input_receiver,
@@ -147,6 +152,12 @@ impl Ui {
                 self.machine.run_cycle();
             }
             UiState::Paused => {}
+        }
+        match self.machine.state() {
+            MachineState::Running => {}
+            MachineState::Halted(halt_reason) => {
+                self.quit_sender.send(Some(format!("State machine halted: {}", halt_reason)));
+            }
         }
         Ok(())
     }
@@ -409,7 +420,7 @@ impl Ui {
     fn input(&mut self, event: event::KeyEvent) -> anyhow::Result<()> {
         match event.code {
             KeyCode::Char('q') => {
-                self.quit_sender.send(())?;
+                self.quit_sender.send(None)?;
             }
             KeyCode::Char(' ') => match self.state {
                 UiState::Paused => {
@@ -439,12 +450,11 @@ pub fn start(machine: Machine) -> anyhow::Result<()> {
     enable_raw_mode()?;
 
     let (input_sender, input_receiver) = mpsc::channel::<KeyEvent>();
-    let (quit_sender, quit_receiver) = mpsc::channel::<()>();
+    let (quit_sender, quit_receiver) = mpsc::channel::<Option<String>>();
     let mut ui = Ui::new(machine, input_receiver, quit_sender.clone());
 
-    let mut last_draw_time = Instant::now();
-
     std::thread::spawn(move || -> Result<(), anyhow::Error> {
+        let mut last_draw_time = Instant::now();
         loop {
             ui.tick()?;
             let now = Instant::now();
@@ -466,7 +476,7 @@ pub fn start(machine: Machine) -> anyhow::Result<()> {
                             .contains(crossterm::event::KeyModifiers::CONTROL)
                     {
                         // signal by settting our AtomicBool to false
-                        quit_sender.send(())?;
+                        quit_sender.send(None)?;
                     } else {
                         input_sender.send(key_event)?;
                     }
@@ -475,8 +485,11 @@ pub fn start(machine: Machine) -> anyhow::Result<()> {
         }
     });
 
-    if quit_receiver.iter().next().is_none() {
-        return Err(anyhow!("UI channel broken"));
+    let result = match quit_receiver.iter().next() {
+        Some(payload) => payload,
+        None => {
+            return Err(anyhow!("UI channel broken"));
+        }
     };
 
     // restore terminal
@@ -484,6 +497,10 @@ pub fn start(machine: Machine) -> anyhow::Result<()> {
     disable_raw_mode()?;
     execute!(&mut backend, LeaveAlternateScreen, DisableMouseCapture,)?;
     backend.show_cursor()?;
+
+    if let Some(message) = result {
+        println!("{}", message);
+    }
 
     Ok(())
 }

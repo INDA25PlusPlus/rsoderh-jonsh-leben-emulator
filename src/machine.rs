@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::{fmt::Display, io::{self, Read}};
 
 use crate::{
     coding::{self, reader::Reader},
@@ -206,6 +206,18 @@ pub enum HaltReason {
     StackOverflow,
     StackUnderflow,
     MemoryOverflow,
+}
+
+impl Display for HaltReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HaltReason::HaltInstruction => write!(f, "Encountered halt instruction"),
+            HaltReason::InvalidInstruction => write!(f, "Encountered invalid instruction"),
+            HaltReason::StackOverflow => write!(f, "Stack overflowed"),
+            HaltReason::StackUnderflow => write!(f, "Stack underflowed"),
+            HaltReason::MemoryOverflow => write!(f, "Encountered invalid memory address"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
